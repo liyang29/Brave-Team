@@ -68,42 +68,47 @@
 
 ---
 
-## 3. 当前原型现状（白盒，全在 main 的 `scenes/experiments/`）
+## 3. 当前现状（白盒原型，已是独立项目 Brave Team）
 
+### 可玩闭环（跑局骨架，已跑通）
+标题 `TitleScreen` → 节点地图 `RunMap` → 遭遇 `Encounter`（自动战斗，软站位）→ 回地图 → 魔王（通关）/ 全灭（失败）。
+由 `RunManager`(autoload) 驱动；HP 跨节点保留（消耗战）。**当前遭遇是纯自动，背包 prep 待接入**。
+
+### 实验场景（验证核心机制，仍可单独跑）
 | 场景 | 验证了什么 | 结果 |
 |------|-----------|------|
-| `PositionExperiment.tscn` | 2 排站位（硬触及）| 同队换配队即结果反转 |
+| `BackpackExperiment.tscn`（主玩法核心）| **背包构筑 + 技能书 + 软站位 + 暴击** | 巧搭 20/20、乱搭 0/20 |
 | `GridExperiment.tscn` | 网格站位 + 逐列掩护（硬触及）| 同队换摆位即结果不同 |
-| `BackpackExperiment.tscn` | **背包构筑 + 技能书 + 软站位 + 暴击**（新方向主体）| 巧搭 20/20、乱搭 0/20 |
+| `PositionExperiment.tscn` | 2 排站位（硬触及）| 同队换配队即结果反转 |
 
-- 全量 GUT 测试 **275/275 绿**。
-- 战斗核心（BattleSimulator/BattleCombatant/CombatStrategy/SkillTable/StatBlock/Hero/EnemyData/Party/HeroFactory）**与旧经营层基本解耦**，可整块迁移。
+- 全量 GUT 测试 **71/71 绿**。
+- **实时"做到哪/下一步"以 `PROGRESS.md` 为准。**
 
 ---
 
 ## 4. 路线图
 
-### 要建的 roguelike 骨架（核心模块确认后开新项目搭，详见"工程结构"）
-- [ ] `RunManager` / 跑局状态（当前层、队伍、金币、物品池）
-- [ ] 节点地图 / 旅程（杀戮尖塔式路径 或 线性 + 地形切换）
-- [ ] 遭遇流程（战斗 → 战利品/商店 → 选路 → 下一节点）
-- [ ] 跑局结束（到魔王城 / 团灭）+ 局间 meta 解锁
-- [ ] 真实派遣外壳替换为"商队远征"框架
+> 实时进度（已做/下一步）见 `PROGRESS.md`，本节只给大方向。
+
+- **已完成**：迁出独立项目 + 战斗/背包核心 + 跑局骨架（RunManager / RunMap / Encounter / 入口 TitleScreen）。
+- **下一步**：把背包构筑接成"遭遇前 prep 界面"——让玩家战前搭背包/摆站位，遭遇不再纯自动。
+- **之后**：分支地图 + 商店/事件节点 + 战利品 → 局间 meta 解锁 → 平衡。
 
 ### 预留到后期（已讨论、暂不做）
 - [ ] **AI 选目标考虑站位**（治本）：`choose_target` 按"有效伤害=基础×站位倍率"选目标，避免前排去捅打折的后排等"瞎打"。
-- [ ] **玩家目标优先级策略按钮**（安全阀）：集火残血 / 点后排威胁 / 打高攻 / 各自本能（战前设、自动执行）。先治本 AI 再视情加。注意保持"轻"，别做成 FF12 Gambit。
+- [ ] **玩家目标优先级策略按钮**（安全阀）：集火残血 / 点后排威胁 / 打高攻 / 各自本能。先治本 AI 再视情加。保持"轻"，别做成 FF12 Gambit。
 - [ ] 公共驮兽（马/骆驼）= 共享后勤背包（战斗中不可掏，要有代价）。
 - [ ] 负重、金币经济、更多副属性（法抗/吸血/破甲…见 stats 目录）、技能书参与邻接协同。
 - [ ] 站位"前→后排"数值是否改为 ×0.5（更还原世界树，当前 ×0.7）——待玩后定。
 
 ---
 
-## 5. 工程结构建议（迁移而非重建）
+## 5. 工程结构（迁移已完成）
 
-- **战斗/背包核心可整块搬走**（与经营 Manager 基本无耦合，唯一小耦合是 `Party.from_dict` 引用 HeroManager）。
-- **建议**：核心玩法验证到位后，**开新项目**把战斗核心搬过去、按 roguelike 架构从头搭骨架；旧经营层（GuildManager/FacilityManager/QuestManager/MapManager/TurnManager/WorldMap/HeroAI 等）留在旧项目当存档。
-- **现在**：继续在当前仓库的 `scenes/experiments/` 里验证乐趣，**不急着重建项目**。
+- 战斗/背包核心**已从 Brave Guild 整块迁入本项目**（与旧经营 Manager 解耦；迁移时拆掉了 `Party` 的 HexUtils/HeroManager/Quest 存档依赖）。
+- 旧经营层（GuildManager/FacilityManager/QuestManager/MapManager/TurnManager/WorldMap/HeroAI 等）**留在 Brave Guild 当存档**，未迁入。
+- 新游戏的状态核心 = **`RunManager`(autoload)**，取代旧 GameManager/HeroManager/GuildManager/DataManager 中 roguelike 需要的那部分（状态机 + 队伍 + 金币 + 地图进度）。
+- 目录结构见 `README.md`。
 
 ---
 

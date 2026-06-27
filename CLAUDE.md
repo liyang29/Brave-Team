@@ -37,6 +37,8 @@ Godot 可执行路径在环境变量 `$env:GODOT_PATH`（PowerShell）。
 
 | 文件 | 职责 |
 |------|------|
+| `scripts/autoload/RunManager.gd` | **跑局状态核心(autoload)**：状态机(MAP/ENCOUNTER/VICTORY/GAME_OVER)+队伍+金币+节点进度。`start_run/enter_current_node/resolve_encounter` |
+| `scripts/ui/TitleScreen.gd` / `RunMap.gd` / `Encounter.gd` | 入口 / 节点地图 / 遭遇(开战→BattleSimulator→回报 RunManager) |
 | `scripts/systems/combat/BattleSimulator.gd` | 回合制战斗模拟（纯静态）。入口 `simulate(party, enemy_data_list)` |
 | `BattleCombatant.gd` | 战斗单位包装（含 row/col 站位、skill_cooldowns、extra_stats 副属性）|
 | `CombatStrategy.gd` + `strategies/` | 各职业/敌人 AI（choose_target/choose_skill）|
@@ -64,4 +66,8 @@ Godot 可执行路径在环境变量 `$env:GODOT_PATH`（PowerShell）。
 
 ## 当前阶段 & 下一步
 
-白盒原型，核心 = 可玩的背包脏实验。**下一步搭 roguelike 跑局骨架**（RunManager / 节点地图 / 遭遇流 / meta）。预留项见 `docs/PROGRESS.md`（AI 选目标考虑站位、玩家策略按钮等）。
+白盒原型。**跑局骨架已跑通**（标题→节点地图→遭遇自动战斗→回地图→魔王/全灭，由 RunManager 驱动）。背包/技能书/站位/暴击核心已验证（实验场景 + 71/71 测试）。
+
+**下一步 = 把背包构筑接成"遭遇前 prep 界面"**：让玩家在 Encounter 开战前先搭背包/摆站位，把"纯自动战斗"变回"我搭的 build 在打"。再之后：分支地图/商店/战利品/meta。
+
+实时进度与预留项（AI 选目标考虑站位、玩家策略按钮、驮兽、负重、更多副属性等）见 `docs/PROGRESS.md`。

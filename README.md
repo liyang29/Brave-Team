@@ -42,20 +42,20 @@
 
 ```
 scripts/
+  autoload/RunManager.gd  跑局状态核心（状态机+队伍+金币+地图进度）
   systems/combat/     战斗核心（BattleSimulator/BattleCombatant/策略/TurnLog/BattleResult）
   systems/combat/strategies/  各职业与敌人 AI 策略
   systems/factories/  HeroFactory / EnemyAIFactory
-  systems/run/        【预留】roguelike 跑局逻辑（RunManager/EncounterData/节点地图）
+  systems/run/        【预留】更复杂的跑局逻辑（EncounterData/分支地图/商店）
   systems/Party.gd    队伍（含站位/冷却/副属性注入）
   entities/           Hero/Combatant/EnemyData/StatBlock/Item 等数据层
   utils/SkillTable.gd 技能数据表
   experiments/        BackpackModel + 三个实验场景脚本
-  ui/                 TitleScreen 等 UI 脚本
-  autoload/           【预留】Autoload 单例（如 RunManager）
+  ui/                 TitleScreen / RunMap / Encounter 等 UI 脚本
 scenes/
   ui/                 TitleScreen.tscn（入口）
-  experiments/        BackpackExperiment(主玩法) / Grid / Position
-  run/                【预留】跑局/地图/遭遇/商店场景
+  run/                RunMap.tscn（节点地图）/ Encounter.tscn（遭遇）
+  experiments/        BackpackExperiment(主玩法核心) / Grid / Position
 resources/data/       【预留】数据驱动 .tres（enemies/items/encounters/skills）
 assets/               【预留】美术/音频占位（白盒阶段可空）
 tests/                GUT 测试
@@ -63,4 +63,5 @@ addons/gut/           测试框架
 docs/                 设计与方法文档
 ```
 
-> 标【预留】的目录已建好空架子（含 `.gitkeep` 说明），等做 roguelike 跑局骨架时填充。
+> 跑局闭环已跑通：标题 → 节点地图 → 遭遇(自动战斗) → 回地图 → 魔王(通关)/全灭。
+> 标【预留】的目录已建好空架子（含 `.gitkeep` 说明），等需要时填充。

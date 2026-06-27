@@ -13,7 +13,10 @@
 ## 怎么跑
 
 ```powershell
-# 运行背包实验（主场景）
+# 运行游戏（入口 = 标题画面 TitleScreen，"开始冒险"暂进背包实验）
+& $env:GODOT_PATH --path "D:\program\gameDev\Brave Team"
+
+# 直接进背包实验（主玩法核心）
 & $env:GODOT_PATH --path "D:\program\gameDev\Brave Team" res://scenes/experiments/BackpackExperiment.tscn
 
 # 跑全部 GUT 测试（headless）
@@ -42,12 +45,22 @@ scripts/
   systems/combat/     战斗核心（BattleSimulator/BattleCombatant/策略/TurnLog/BattleResult）
   systems/combat/strategies/  各职业与敌人 AI 策略
   systems/factories/  HeroFactory / EnemyAIFactory
+  systems/run/        【预留】roguelike 跑局逻辑（RunManager/EncounterData/节点地图）
   systems/Party.gd    队伍（含站位/冷却/副属性注入）
   entities/           Hero/Combatant/EnemyData/StatBlock/Item 等数据层
   utils/SkillTable.gd 技能数据表
   experiments/        BackpackModel + 三个实验场景脚本
-scenes/experiments/   BackpackExperiment(主) / Grid / Position
+  ui/                 TitleScreen 等 UI 脚本
+  autoload/           【预留】Autoload 单例（如 RunManager）
+scenes/
+  ui/                 TitleScreen.tscn（入口）
+  experiments/        BackpackExperiment(主玩法) / Grid / Position
+  run/                【预留】跑局/地图/遭遇/商店场景
+resources/data/       【预留】数据驱动 .tres（enemies/items/encounters/skills）
+assets/               【预留】美术/音频占位（白盒阶段可空）
 tests/                GUT 测试
 addons/gut/           测试框架
 docs/                 设计与方法文档
 ```
+
+> 标【预留】的目录已建好空架子（含 `.gitkeep` 说明），等做 roguelike 跑局骨架时填充。

@@ -1,0 +1,2 @@
+预留：Autoload 单例。如 RunManager（跑局状态：当前层/队伍/金币/物品池）。
+在 project.godot 的 [autoload] 注册后生效。

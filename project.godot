@@ -1,0 +1,24 @@
+; Engine configuration file.
+; Brave Team — 小队背包 Roguelike（从 Brave Guild 迁出战斗/背包核心）
+
+config_version=5
+
+[application]
+
+config/name="Brave Team"
+run/main_scene="res://scenes/experiments/BackpackExperiment.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gut/plugin.cfg")
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"

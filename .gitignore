@@ -1,6 +1,9 @@
 # Godot 4 导入缓存（自动生成，不入库）
 .godot/
 
+# Claude Code worktrees（临时工作副本，不入库）；但 .claude/skills 要入库
+.claude/worktrees/
+
 # 临时/输出
 *.tmp
 *_out.txt

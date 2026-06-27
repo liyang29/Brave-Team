@@ -9,6 +9,10 @@ config/name="Brave Team"
 run/main_scene="res://scenes/ui/TitleScreen.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
+[autoload]
+
+RunManager="*res://scripts/autoload/RunManager.gd"
+
 [display]
 
 window/size/viewport_width=1920

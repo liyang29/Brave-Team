@@ -10,6 +10,7 @@ extends Control
 # 做好后，改为进正式跑局场景即可。
 # ─────────────────────────────────────────────────────────────────────────────
 
+const SCENE_RUNMAP   := "res://scenes/run/RunMap.tscn"
 const SCENE_BACKPACK := "res://scenes/experiments/BackpackExperiment.tscn"
 const SCENE_GRID     := "res://scenes/experiments/GridExperiment.tscn"
 const SCENE_POSITION := "res://scenes/experiments/PositionExperiment.tscn"
@@ -74,8 +75,9 @@ func _spacer(h: int) -> Control:
 
 
 func _on_start() -> void:
-	# 占位：当前进背包实验（唯一可玩核心）。RunManager/跑局场景做好后改这里。
-	_goto(SCENE_BACKPACK)
+	# 开新跑局 → 节点地图
+	RunManager.start_run()
+	_goto(SCENE_RUNMAP)
 
 
 func _goto(scene_path: String) -> void:

@@ -116,7 +116,7 @@ func _build_squad_board() -> Control:
 	box.add_child(grid)
 	var legend := Label.new()
 	legend.modulate = Color(0.6, 0.6, 0.6)
-	legend.text = "站位：前排可打任何人；后排里 近战只能打对方前排、远程(法/弓/盗)可打后排。后排受物理伤×0.7、后排近战输出×0.5（魔法不受影响）；前排至少留1人，前排全灭后排顶上"
+	legend.text = "站位：前排可打任何人；后排里 近战(战/牧/盗)只能打对方前排、远程(法/弓)可打后排。后排受物理伤×0.7、后排近战输出×0.5（魔法不受影响）；前排至少留1人，前排全灭后排顶上"
 	box.add_child(legend)
 	return box
 

@@ -467,11 +467,13 @@ static func _get_allies(unit: BattleCombatant, hero_bcs: Array, enemy_bcs: Array
 
 # ── 私有：创建战斗单位 ────────────────────────────────────────────────────────
 
-# 远程/突袭职业可越过敌方前排攻击后排（方案 B）
+# 英雄的"远程"标签（按职业）：在此清单里 = 远程（后排也能越过前排打后排）；
+# 不在 = 近战（后排只能打对方前排，需顶到前排才能威胁后排）。
+# 盗贼定位为近战刺客（不在此列）——要它咬后排脆皮就得顶前排，制造站位取舍。
+# 怪物侧用 EnemyData.is_ranged 数据标签表示同一概念。
 const REACH_BACK_CLASSES: Array = [
 	Hero.HeroClass.MAGE,
 	Hero.HeroClass.ARCHER,
-	Hero.HeroClass.ROGUE,
 ]
 
 static func _create_hero_combatants(heroes: Array, party = null) -> Array:

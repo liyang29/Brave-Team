@@ -36,6 +36,7 @@
 | `docs/METHODOLOGY.md` | 思想方法（怎么判断好不好玩、怎么做决策）|
 | `docs/COMBAT_REVAMP_AUTOBATTLER.md` | 战斗模块细节 |
 | `docs/COMBAT_STATS_CATALOG.md` | 战斗属性菜单（已有/可加）|
+| `docs/PROJECT_STRUCTURE.md` | **项目结构逐文件细表**（路径/属性/职责，核对用）|
 | `CLAUDE.md` | 代码库结构与开发约定 |
 
 ## 目录结构

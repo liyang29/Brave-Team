@@ -11,6 +11,8 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_RUNMAP   := "res://scenes/run/RunMap.tscn"
+const SCENE_SHOP     := "res://scenes/run/Shop.tscn"
+const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
 const SCENE_BACKPACK := "res://scenes/experiments/BackpackExperiment.tscn"
 const SCENE_GRID     := "res://scenes/experiments/GridExperiment.tscn"
 const SCENE_POSITION := "res://scenes/experiments/PositionExperiment.tscn"
@@ -75,9 +77,11 @@ func _spacer(h: int) -> Control:
 
 
 func _on_start() -> void:
-	# 开新跑局 → 节点地图
+	# 开新跑局 → 直接进第 0 节点（村庄商店）；离开村庄后才回到节点地图
 	RunManager.start_run()
-	_goto(SCENE_RUNMAP)
+	RunManager.enter_current_node()
+	var node: Dictionary = RunManager.current_node()
+	_goto(SCENE_SHOP if node.get("type") == "shop" else SCENE_ENCOUNTER)
 
 
 func _goto(scene_path: String) -> void:

@@ -17,11 +17,26 @@ signal depth_changed(new_depth)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, REST, VICTORY, GAME_OVER }
+enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, REST, TAVERN, VICTORY, GAME_OVER }
 
 const START_GOLD := 500
 const SHOP_STOCK_SIZE := 6
 const REST_HEAL_PCT := 0.5   # 泉水/休息点：全员回复最大血的比例（消耗战泄压阀）
+const MAX_PARTY := 5         # 队伍上限（起手 3，酒馆最多招到 5）
+const TAVERN_OFFERS := 3     # 酒馆每次上几个候选
+const RECRUIT_COST := 120    # 招募一个英雄的金币价（和买装备抢钱）
+
+# 英雄池：跑局可用的英雄模板（加英雄/调数值=加一行；盗贼/猎人已纳入）。
+# base = 低裸属性（战力靠背包）；技能在背包书注入，故此处不配技能。
+const HERO_TEMPLATES: Dictionary = {
+	"warrior": { "cls": Hero.HeroClass.WARRIOR, "name": "战士", "hp": 90, "atk": 6, "def": 8, "spd": 9,  "magic": 0, "mp": 40 },
+	"mage":    { "cls": Hero.HeroClass.MAGE,    "name": "法师", "hp": 55, "atk": 3, "def": 3, "spd": 12, "magic": 5, "mp": 70 },
+	"priest":  { "cls": Hero.HeroClass.PRIEST,  "name": "牧师", "hp": 65, "atk": 3, "def": 4, "spd": 9,  "magic": 5, "mp": 70 },
+	"rogue":   { "cls": Hero.HeroClass.ROGUE,   "name": "盗贼", "hp": 70, "atk": 7, "def": 5, "spd": 16, "magic": 0, "mp": 50 },
+	"archer":  { "cls": Hero.HeroClass.ARCHER,  "name": "猎人", "hp": 80, "atk": 7, "def": 6, "spd": 12, "magic": 0, "mp": 50 },
+}
+# 起手队伍（从英雄池取这几个）
+const STARTER_TEAM: Array = ["warrior", "mage", "priest"]
 
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
@@ -42,6 +57,9 @@ var owned_items: Dictionary = {}
 # squad_slots：站位摆放 Vector2i(col,row) -> Hero。row0=前排 / row1=后排（soft_row）。
 var squad_slots: Dictionary = {}
 
+# tavern_offers：当前酒馆在招的候选英雄模板 id 数组（招一个移除一个）。
+var tavern_offers: Array = []
+
 # pending_draft：上一场非 boss 胜利抽出的待选战利品（item_id 数组），Draft 界面读它。
 var pending_draft: Array = []
 # shop_stock：当前商店在售物品（item_id 数组，买一件移除一件），进商店时生成。
@@ -55,6 +73,7 @@ func start_run() -> void:
 	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
 	owned_items = {}                                 # 空背包起手，靠商店/战利品积累
 	squad_slots = _default_formation()
+	tavern_offers = []
 	pending_draft = []
 	shop_stock = []
 	gold = START_GOLD                                # 起步金币，开局村庄商店采购
@@ -82,6 +101,9 @@ func enter_current_node() -> void:
 			_set_state(State.SHOP)
 		"rest":
 			_set_state(State.REST)
+		"tavern":
+			tavern_offers = _roll_recruits(TAVERN_OFFERS)
+			_set_state(State.TAVERN)
 		_:
 			_set_state(State.ENCOUNTER)
 
@@ -135,6 +157,57 @@ func leave_shop() -> void:
 		_set_state(State.MAP)
 
 
+# ── 酒馆 / 招募 ───────────────────────────────────────────────────────────────
+
+## 是否还能再招（未满队）
+func party_is_full() -> bool:
+	return roster.size() >= MAX_PARTY
+
+## 招募一个候选英雄：队伍没满 + 金币够 + 在招 → 入队、扣钱、下架、自动站位。
+func recruit(template_id: String) -> bool:
+	if party_is_full():
+		return false
+	if not (template_id in tavern_offers):
+		return false
+	if gold < RECRUIT_COST:
+		return false
+	gold -= RECRUIT_COST
+	gold_changed.emit(gold)
+	tavern_offers.erase(template_id)
+	var entry: Dictionary = make_hero_entry(template_id)
+	roster.append(entry)
+	party.append(entry["hero"])
+	_place_in_empty_slot(entry["hero"])
+	return true
+
+## 离开酒馆 → 前进到下一节点。
+func leave_tavern() -> void:
+	tavern_offers = []
+	depth += 1
+	depth_changed.emit(depth)
+	if depth >= nodes.size():
+		_set_state(State.VICTORY)
+	else:
+		_set_state(State.MAP)
+
+# 抽 n 个英雄池模板作候选（可重复职业；允许已在队的职业再来）。
+func _roll_recruits(n: int) -> Array:
+	var ids: Array = HERO_TEMPLATES.keys()
+	var out: Array = []
+	for i in range(n):
+		out.append(ids[randi() % ids.size()])
+	return out
+
+# 把新英雄放进第一个空站位格（优先后排 row1，再前排 row0）。
+func _place_in_empty_slot(hero) -> void:
+	for row in [1, 0]:
+		for col in range(3):
+			var cell := Vector2i(col, row)
+			if not squad_slots.has(cell):
+				squad_slots[cell] = hero
+				return
+
+
 ## 遭遇结束回报：
 ##   负 → 全灭游戏结束；
 ##   魔王胜 → 直接通关（不抽战利品）；
@@ -177,24 +250,26 @@ func _set_state(s: int) -> void:
 	state_changed.emit(s)
 
 
-# ── 起手名册（Step 5：裸 base 压低，战力主要来自背包/商店/战利品）──────────────
+# ── 起手名册（从英雄池 HERO_TEMPLATES 取 STARTER_TEAM）─────────────────────────
 # 返回 Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]。
 # base = 英雄"光身"裸属性（裸base 真相源）；grid 空（起手空背包）。
-# 注：技能在 BackpackLoadout.build_party 里按背包技能书重置，故 _starter 的技能在
-#     跑局战斗中会被背包书覆盖（这里留着只是占位、不影响）。
+# 注：技能在 BackpackLoadout.build_party 里按背包技能书重置，故此处不配技能。
 
 func _make_starter_roster() -> Array:
-	return [
-		_starter_entry(Hero.HeroClass.WARRIOR, "战士", 90, 6, 8, 9, 0, 40, ["slash"]),
-		_starter_entry(Hero.HeroClass.MAGE,    "法师", 55, 3, 3, 12, 5, 70, ["fireball"]),
-		_starter_entry(Hero.HeroClass.PRIEST,  "牧师", 65, 3, 4, 9, 5, 70, ["holy_heal", "purify"]),
-	]
+	var out: Array = []
+	for tid in STARTER_TEAM:
+		out.append(make_hero_entry(tid))
+	return out
 
-# 造一个名册条目：英雄 + 裸base 字典 + 空背包
-func _starter_entry(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
-					magic: int, mp: int, skills: Array) -> Dictionary:
-	var hero: Hero = _starter(cls, nm, hp, atk, def_v, spd, magic, mp, skills)
-	var base: Dictionary = { "hp": hp, "atk": atk, "def": def_v, "magic": magic, "spd": spd, "mp": mp }
+# 按英雄池模板 id 造一个名册条目（起手/招募共用）。
+func make_hero_entry(template_id: String) -> Dictionary:
+	var t: Dictionary = HERO_TEMPLATES.get(template_id, {})
+	var hero: Hero = _starter(int(t.get("cls", Hero.HeroClass.WARRIOR)), String(t.get("name", template_id)),
+		int(t.get("hp", 60)), int(t.get("atk", 5)), int(t.get("def", 5)),
+		int(t.get("spd", 10)), int(t.get("magic", 0)), int(t.get("mp", 50)), [])
+	var base: Dictionary = { "hp": int(t.get("hp", 60)), "atk": int(t.get("atk", 5)),
+		"def": int(t.get("def", 5)), "magic": int(t.get("magic", 0)),
+		"spd": int(t.get("spd", 10)), "mp": int(t.get("mp", 50)) }
 	return { "hero": hero, "base": base, "grid": {} }
 
 # 默认站位：战士前排，法师/牧师后排（row0 前 / row1 后；soft_row）
@@ -232,6 +307,7 @@ func _build_map() -> Array:
 	return [
 		_node("shop", "村庄", [], 0),
 		_node("battle", "林间遭遇", MonsterFactory.create_group(["wolf", "wolf"]), 20),
+		_node("tavern", "酒馆", [], 0),
 		_node("battle", "剧毒巢穴", MonsterFactory.create_group(["venom_bug", "stone_guard"]), 25),
 		_node("rest",   "泉水", [], 0),
 		_node("battle", "废墟伏击", MonsterFactory.create_group(["bandit", "ranger"]), 30),

@@ -8,6 +8,7 @@ extends Control
 const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
 const SCENE_SHOP := "res://scenes/run/Shop.tscn"
 const SCENE_REST := "res://scenes/run/Rest.tscn"
+const SCENE_TAVERN := "res://scenes/run/Tavern.tscn"
 const SCENE_TITLE := "res://scenes/ui/TitleScreen.tscn"
 
 func _ready() -> void:
@@ -83,6 +84,7 @@ func _ready() -> void:
 		match node.get("type"):
 			"shop": next = SCENE_SHOP
 			"rest": next = SCENE_REST
+			"tavern": next = SCENE_TAVERN
 		get_tree().change_scene_to_file(next))
 	root.add_child(enter)
 

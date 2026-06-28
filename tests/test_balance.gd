@@ -50,7 +50,7 @@ func _run_once(grids: Array) -> bool:
 	for d in range(RunManager.nodes.size()):
 		var node: Dictionary = RunManager.nodes[d]
 		match node.get("type"):
-			"shop":
+			"shop", "tavern":
 				pass
 			"rest":
 				RunManager.rest_heal()

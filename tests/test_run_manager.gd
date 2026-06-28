@@ -5,11 +5,13 @@ extends GutTest
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-# 过一个节点：村庄→离开；泉水→回血并离开；战斗→胜利(若进 DRAFT 用 keep 完成)前进。
+# 过一个节点：村庄→离开；酒馆→离开；泉水→回血并离开；战斗→胜利(若进 DRAFT 用 keep 完成)前进。
 func _advance(keep: Array = []) -> void:
 	match RunManager.current_node().get("type"):
 		"shop":
 			RunManager.leave_shop()
+		"tavern":
+			RunManager.leave_tavern()
 		"rest":
 			RunManager.rest_heal()
 			RunManager.leave_rest()
@@ -17,6 +19,12 @@ func _advance(keep: Array = []) -> void:
 			RunManager.resolve_encounter(true)
 			if RunManager.state == RunManager.State.DRAFT:
 				RunManager.finish_draft(keep)
+
+# 一直过节点直到当前节点是指定类型（到不了就停在终点）。
+func _goto_type(t: String) -> void:
+	RunManager.start_run()
+	while RunManager.current_node().get("type") != t and RunManager.depth < RunManager.nodes.size():
+		_advance()
 
 
 func test_start_run_sets_up_state() -> void:
@@ -171,18 +179,12 @@ func test_leave_shop_advances_to_first_battle() -> void:
 
 # ── 泉水 / 休息点 ─────────────────────────────────────────────────────────────
 
-func _goto_rest() -> void:
-	RunManager.start_run()
-	RunManager.leave_shop()   # →1 林间
-	_advance()                # →2 剧毒
-	_advance()                # →3 泉水
-
-func test_node_3_is_rest() -> void:
-	_goto_rest()
-	assert_eq(RunManager.current_node().get("type"), "rest", "第 3 节点是泉水")
+func test_can_reach_rest() -> void:
+	_goto_type("rest")
+	assert_eq(RunManager.current_node().get("type"), "rest", "地图里能走到泉水节点")
 
 func test_enter_rest_sets_state() -> void:
-	_goto_rest()
+	_goto_type("rest")
 	RunManager.enter_current_node()
 	assert_eq(RunManager.state, RunManager.State.REST, "进泉水 → REST 状态")
 
@@ -204,8 +206,64 @@ func test_rest_does_not_revive_dead() -> void:
 	assert_eq(h.current_hp, 0, "阵亡的不被泉水复活")
 
 func test_leave_rest_advances() -> void:
-	_goto_rest()
+	_goto_type("rest")
+	var d: int = RunManager.depth
 	RunManager.enter_current_node()
 	RunManager.leave_rest()
-	assert_eq(RunManager.depth, 4, "离开泉水 → 第 4 节点")
-	assert_eq(RunManager.current_node().get("type"), "battle", "第 4 节点是战斗（废墟）")
+	assert_eq(RunManager.depth, d + 1, "离开泉水 → 前进一个节点")
+	assert_eq(RunManager.current_node().get("type"), "battle", "泉水后是战斗（废墟）")
+
+
+# ── 酒馆 / 招募 ───────────────────────────────────────────────────────────────
+
+func test_can_reach_tavern() -> void:
+	_goto_type("tavern")
+	assert_eq(RunManager.current_node().get("type"), "tavern", "地图里能走到酒馆节点")
+
+func test_enter_tavern_offers() -> void:
+	_goto_type("tavern")
+	RunManager.enter_current_node()
+	assert_eq(RunManager.state, RunManager.State.TAVERN, "进酒馆 → TAVERN 状态")
+	assert_eq(RunManager.tavern_offers.size(), RunManager.TAVERN_OFFERS, "上 3 个候选")
+
+func test_recruit_adds_hero_and_deducts_gold() -> void:
+	_goto_type("tavern")
+	RunManager.enter_current_node()
+	RunManager.gold = 1000
+	var n0: int = RunManager.roster.size()
+	var tid: String = RunManager.tavern_offers[0]
+	var g0: int = RunManager.gold
+	assert_true(RunManager.recruit(tid), "金币够且未满 → 招募成功")
+	assert_eq(RunManager.roster.size(), n0 + 1, "名册多一人")
+	assert_eq(RunManager.party.size(), n0 + 1, "party 同步多一人")
+	assert_eq(RunManager.gold, g0 - RunManager.RECRUIT_COST, "扣招募费")
+	assert_false(tid in RunManager.tavern_offers, "招过的候选下架")
+
+func test_recruit_blocked_when_party_full() -> void:
+	_goto_type("tavern")
+	RunManager.enter_current_node()
+	RunManager.gold = 9999
+	# 招到满（起手 3 → 招到 MAX_PARTY）
+	while not RunManager.party_is_full() and not RunManager.tavern_offers.is_empty():
+		RunManager.recruit(RunManager.tavern_offers[0])
+	assert_true(RunManager.party_is_full(), "招到队伍上限")
+	assert_eq(RunManager.roster.size(), RunManager.MAX_PARTY, "人数=上限")
+
+func test_recruit_blocked_without_gold() -> void:
+	_goto_type("tavern")
+	RunManager.enter_current_node()
+	RunManager.gold = 0
+	var n0: int = RunManager.roster.size()
+	assert_false(RunManager.recruit(RunManager.tavern_offers[0]), "没钱 → 招募失败")
+	assert_eq(RunManager.roster.size(), n0, "人数不变")
+
+func test_leave_tavern_advances() -> void:
+	_goto_type("tavern")
+	var d: int = RunManager.depth
+	RunManager.enter_current_node()
+	RunManager.leave_tavern()
+	assert_eq(RunManager.depth, d + 1, "离开酒馆 → 前进一个节点")
+
+func test_hero_pool_has_rogue_and_archer() -> void:
+	assert_true(RunManager.HERO_TEMPLATES.has("rogue"), "英雄池含盗贼")
+	assert_true(RunManager.HERO_TEMPLATES.has("archer"), "英雄池含猎人")

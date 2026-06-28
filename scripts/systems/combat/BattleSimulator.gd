@@ -415,10 +415,11 @@ static func _get_opponents(unit: BattleCombatant, hero_bcs: Array, enemy_bcs: Ar
 # 近战单位：可打「暴露」单位 = 所有前排 + 所在列没有存活前排掩护的后排。
 #   → 把脆皮后排摆在有肉盾的同一列才挡得住；摆在空列会被近战点穿。
 # 入参 opponents 已是存活列表；返回非空（全暴露则退化为全体）。
-# soft_row 触及：远程(can_reach_back)可打任何人；近战只能打对方前排。
+# soft_row 触及（模型 C：站位 + 职业）：
+#   前排：打任何人；后排：远程(can_reach_back)打任何人、近战只能打对方前排。
 # 配合"前排全灭后排顶上"，近战永远有前排可打；对方无前排时退化为全体（兜底）。
 static func _soft_reachable(unit: BattleCombatant, opponents: Array) -> Array:
-	if unit.can_reach_back:
+	if unit.row == "front" or unit.can_reach_back:
 		return opponents
 	var front: Array = opponents.filter(func(bc): return bc.row == "front")
 	return front if not front.is_empty() else opponents

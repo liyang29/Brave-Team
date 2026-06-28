@@ -17,13 +17,13 @@ class_name MonsterFactory
 #   ai     : EnemyData.AI_*（默认 AI_BASIC_ATTACK）
 const ENEMIES: Dictionary = {
 	# ── 跑局线（村庄→林间→剧毒→泉水→废墟→魔王）──────────────────────────────
-	"wolf":        { "name": "野狼", "hp": 48, "atk": 8,  "def": 2, "spd": 9 },
-	"venom_bug":   { "name": "毒虫", "hp": 32, "atk": 7,  "def": 1, "spd": 11, "row": "back", "ranged": true },
-	"stone_guard": { "name": "石卫", "hp": 78, "atk": 9,  "def": 6, "spd": 6 },
-	"bandit":      { "name": "强盗", "hp": 66, "atk": 10, "def": 4, "spd": 10 },
-	"ranger":      { "name": "游侠", "hp": 46, "atk": 9,  "def": 2, "spd": 12, "row": "back", "ranged": true },
-	"demon_lord":  { "name": "魔王", "hp": 200, "atk": 16, "def": 9, "spd": 10 },
-	"claw_minion": { "name": "爪牙", "hp": 72, "atk": 10, "def": 4, "spd": 9 },
+	"wolf":        { "name": "野狼", "hp": 56, "atk": 10, "def": 2, "spd": 9 },
+	"venom_bug":   { "name": "毒虫", "hp": 45, "atk": 8,  "def": 1, "spd": 11, "row": "back", "ranged": true },
+	"stone_guard": { "name": "石卫", "hp": 93, "atk": 10, "def": 7, "spd": 6 },
+	"bandit":      { "name": "强盗", "hp": 78, "atk": 12, "def": 4, "spd": 10 },
+	"ranger":      { "name": "游侠", "hp": 60, "atk": 11, "def": 2, "spd": 12, "row": "back", "ranged": true },
+	"demon_lord":  { "name": "魔王", "hp": 222, "atk": 18, "def": 10, "spd": 10 },
+	"claw_minion": { "name": "爪牙", "hp": 84, "atk": 12, "def": 4, "spd": 9 },
 
 	# ── 实验场景用（前排蛮兵 + 后排巫师）──────────────────────────────────────
 	"brute":     { "name": "蛮兵",   "hp": 90, "atk": 15, "def": 6, "spd": 8, "ai": EnemyData.AI_AGGRESSIVE },

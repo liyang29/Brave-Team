@@ -104,4 +104,5 @@ func _make_row(item_id: String) -> Control:
 
 func _on_buy(item_id: String) -> void:
 	RunManager.buy_item(item_id)
-	_refresh()
+	# 延迟刷新：避免在"买"按钮自身 pressed 信号发射途中把它 free 掉而报错
+	call_deferred("_refresh")

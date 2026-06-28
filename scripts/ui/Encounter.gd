@@ -8,6 +8,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
+const SCENE_DRAFT := "res://scenes/run/Draft.tscn"
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
 
@@ -136,7 +137,9 @@ func _render_result(result: BattleResult) -> void:
 		_action_btn.pressed.disconnect(c.callable)
 	_action_btn.pressed.connect(func():
 		RunManager.resolve_encounter(won, result)
-		get_tree().change_scene_to_file(SCENE_MAP))
+		# 普通胜利 → 战利品 draft；通关/失败 → 回地图（地图据状态显示横幅）
+		var next := SCENE_DRAFT if RunManager.state == RunManager.State.DRAFT else SCENE_MAP
+		get_tree().change_scene_to_file(next))
 
 
 func _fmt(log) -> String:

@@ -1,0 +1,54 @@
+extends RefCounted
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LootTable — 战利品掉落（纯函数，便于测试）
+#
+# 按 rarity 权重从 BackpackModel.ITEMS 加权随机抽 N 件（同一次抽不重复）。
+# 胜利后由 RunManager 调 draw_draft(3)，Draft 界面让玩家三选二。
+#
+# 故意不带 class_name（preload 引入），同 BackpackModel/BackpackLoadout 路子。
+# ─────────────────────────────────────────────────────────────────────────────
+
+const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+
+# 各稀有度的抽取权重（越大越常见）。普通 65 / 稀有 27 / 史诗 8。
+const RARITY_WEIGHTS: Dictionary = {
+	"common": 65,
+	"rare": 27,
+	"epic": 8,
+}
+
+
+## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
+static func draw_draft(count: int) -> Array:
+	var pool: Array = Backpack.ITEMS.keys()
+	var result: Array = []
+	var n: int = min(count, pool.size())
+	for i in range(n):
+		var pick: String = _weighted_pick(pool)
+		if pick == "":
+			break
+		result.append(pick)
+		pool.erase(pick)   # 不重复
+	return result
+
+
+## 从候选 id 列表里按 rarity 权重随机取一个
+static func _weighted_pick(candidates: Array) -> String:
+	var total: int = 0
+	for id in candidates:
+		total += _weight_of(id)
+	if total <= 0:
+		return ""
+	var roll: int = randi() % total
+	for id in candidates:
+		roll -= _weight_of(id)
+		if roll < 0:
+			return id
+	return candidates[candidates.size() - 1]   # 兜底（理论不达）
+
+
+## 单件物品的抽取权重（按 rarity；未知 rarity 当 common）
+static func _weight_of(item_id: String) -> int:
+	var rarity: String = Backpack.ITEMS.get(item_id, {}).get("rarity", "common")
+	return int(RARITY_WEIGHTS.get(rarity, RARITY_WEIGHTS["common"]))

@@ -44,8 +44,8 @@
 - **✅ Step 1（已完成）抽 builder**：`scripts/systems/BackpackLoadout.gd` 的 `build_party(loadouts, squad_slots, full_heal)`，实验改调它（`full_heal=true`），跑局将传 `false` 钳血。配 `test_backpack_loadout.gd`（含幂等、HP做法A）。
 - **✅ Step 2（已完成）状态进 RunManager**：名册 `roster=[{hero,base,grid}]` + `owned_items` 库存 + `squad_slots` 站位，`start_run` 初始化（空背包/空库存/默认站位），`party` 改为名册视图。裸 base 暂用占位高值（低值留到 Step 3）。扩 `test_run_manager`。
 - **✅ Step 3（已完成）抽 `BackpackPrepPanel` + Encounter 用它**：共享编辑组件 `scripts/ui/BackpackPrepPanel.gd`（VBoxContainer，按引用操作 roster/owned_items/squad_slots）。实验场景 + Encounter 都改用它。Encounter 开战前嵌入 → 调 `build_party(full_heal=false)` 钳血 → simulate → resolve。配 `test_backpack_prep_panel`（放入/退回/校验）+ RunManager 端到端战斗路径测试。
-  - **DEBUG**：`RunManager._DEBUG_STARTER_ITEMS` 起手塞了一套物品好测试——**Step 4 战利品做好后删除、库存改回空 `{}`**。
-- **Step 4 战利品 draft**：ITEMS 加 `rarity` → 加权抽 3 件 → 胜利后弹 draft 界面（丢 1 留 2）→ 留下的进 `owned_items`。新增 RunManager `DRAFT` 状态。
+  - ~~DEBUG 起手种子~~ → **Step 4 已删，库存改回空 `{}`**。
+- **✅ Step 4（已完成）战利品 draft**：ITEMS 加 `rarity`（普通/稀有/史诗）+ `scripts/systems/LootTable.gd`（权重 65/27/8 加权不重复抽）。RunManager 加 `State.DRAFT` + `pending_draft` + `finish_draft()`：普通胜利 → 抽 3 件进 DRAFT；魔王胜 → 直接通关不抽。新建 `scenes/run/Draft.tscn`+`DraftScreen.gd`（三选二，点丢 1 留 2 进库存）。已删 debug 种子、库存改回空。配 `test_loot_table` + RunManager draft 用例。共 97/97 绿。
 - **Step 5 首战平衡**：调第一个节点敌人到"裸队险胜"，跑几把验证开局不卡死。
 - **Step 6 休息/泉水回血点（与战利品同期，不能拖到后面）**：在节点地图插入非战斗的回血节点。
   - **为什么和战利品绑一起做**：我们定了 ① **不回血（纯消耗战）**，整局 HP 只降不升，3 战 + 魔王全程不回血会非常残酷、大概率没到魔王就团灭。**回血点是消耗战的泄压阀，是必需品**，没它"不回血"这条决定就站不住。

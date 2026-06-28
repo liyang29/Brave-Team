@@ -15,7 +15,9 @@ signal state_changed(new_state)
 signal gold_changed(new_gold)
 signal depth_changed(new_depth)
 
-enum State { NONE, MAP, ENCOUNTER, VICTORY, GAME_OVER }
+const LootTable = preload("res://scripts/systems/LootTable.gd")
+
+enum State { NONE, MAP, ENCOUNTER, DRAFT, VICTORY, GAME_OVER }
 
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
@@ -36,18 +38,8 @@ var owned_items: Dictionary = {}
 # squad_slots：站位摆放 Vector2i(col,row) -> Hero。row0=前排 / row1=后排（soft_row）。
 var squad_slots: Dictionary = {}
 
-# DEBUG（Step 3 临时）：起手就给一套物品，好在战利品(Step 4)做好前端到端测试 prep。
-# ⚠️ Step 4 战利品 draft 接好后删除本常量 + 把 start_run 的 seed 改回空 {}。
-const _DEBUG_STARTER_ITEMS: Dictionary = {
-	"iron_sword": 1, "longsword": 1, "whetstone": 1,
-	"shield": 1, "chainmail": 1, "leather": 1,
-	"staff": 1, "tome": 1, "holy_symbol": 1,
-	"amulet": 1, "charm": 1,
-	"book_slash": 1, "book_cleave": 1,
-	"book_fireball": 1, "book_icelance": 1,
-	"book_heal": 1, "book_purify": 1,
-	"crit_gem": 1, "keen_edge": 1, "berserk_ring": 1,
-}
+# pending_draft：上一场非 boss 胜利抽出的待选战利品（item_id 数组），Draft 界面读它。
+var pending_draft: Array = []
 
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
@@ -55,8 +47,9 @@ const _DEBUG_STARTER_ITEMS: Dictionary = {
 func start_run() -> void:
 	roster = _make_starter_roster()
 	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
-	owned_items = _DEBUG_STARTER_ITEMS.duplicate()  # DEBUG：见下方说明
+	owned_items = {}                                 # 空背包起手，靠战利品积累
 	squad_slots = _default_formation()
+	pending_draft = []
 	gold = 0
 	depth = 0
 	nodes = _build_map()
@@ -79,13 +72,30 @@ func enter_current_node() -> void:
 	_set_state(State.ENCOUNTER)
 
 
-## 遭遇结束回报：胜 → 拿钱前进（到底=通关）；负 → 全灭游戏结束
+## 遭遇结束回报：
+##   负 → 全灭游戏结束；
+##   魔王胜 → 直接通关（不抽战利品）；
+##   普通胜 → 拿钱 + 抽 3 件战利品进入 DRAFT（depth 待 finish_draft 后再前进）。
 func resolve_encounter(won: bool, result = null) -> void:
 	last_result = result
 	if not won:
 		_set_state(State.GAME_OVER)
 		return
 	add_gold(int(current_node().get("gold", 0)))
+	if is_boss_node():
+		depth += 1
+		depth_changed.emit(depth)
+		_set_state(State.VICTORY)
+		return
+	pending_draft = LootTable.draw_draft(3)
+	_set_state(State.DRAFT)
+
+
+## 战利品 draft 结束：留下的物品进库存 → 前进到下一节点（或通关）。
+func finish_draft(kept: Array) -> void:
+	for id in kept:
+		owned_items[id] = int(owned_items.get(id, 0)) + 1
+	pending_draft = []
 	depth += 1
 	depth_changed.emit(depth)
 	if depth >= nodes.size():

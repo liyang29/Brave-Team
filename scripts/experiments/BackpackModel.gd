@@ -11,34 +11,35 @@ extends RefCounted
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── 物品表 ────────────────────────────────────────────────────────────────────
-# 每件：name + 属性(atk/def/hp/magic) + tag(用于协同)
+# 每件：name + 属性(atk/def/hp/magic) + tag(用于协同) + rarity(战利品掉落权重档)
+# rarity: "common"/"rare"/"epic"，权重见 LootTable.RARITY_WEIGHTS。
 const ITEMS: Dictionary = {
-	"iron_sword":  { "name": "铁剑",   "atk": 6,  "tag": "blade" },
-	"longsword":   { "name": "长剑",   "atk": 8,  "tag": "blade" },
-	"whetstone":   { "name": "磨刀石", "atk": 2,  "tag": "sharpen" },
-	"shield":      { "name": "圆盾",   "def": 5,  "tag": "guard" },
-	"chainmail":   { "name": "锁甲",   "def": 6, "hp": 10, "tag": "armor" },
-	"leather":     { "name": "皮甲",   "def": 3, "hp": 15, "tag": "armor" },
-	"staff":       { "name": "法杖",   "magic": 6, "tag": "arcane" },
-	"tome":        { "name": "魔典",   "magic": 4, "tag": "arcane" },
-	"holy_symbol": { "name": "圣徽",   "magic": 5, "tag": "holy" },
-	"amulet":      { "name": "护符",   "hp": 12, "def": 2, "tag": "vital" },
-	"charm":       { "name": "红宝石", "hp": 20, "tag": "vital" },
+	"iron_sword":  { "name": "铁剑",   "atk": 6,  "tag": "blade",   "rarity": "common" },
+	"longsword":   { "name": "长剑",   "atk": 8,  "tag": "blade",   "rarity": "rare" },
+	"whetstone":   { "name": "磨刀石", "atk": 2,  "tag": "sharpen", "rarity": "common" },
+	"shield":      { "name": "圆盾",   "def": 5,  "tag": "guard",   "rarity": "common" },
+	"chainmail":   { "name": "锁甲",   "def": 6, "hp": 10, "tag": "armor", "rarity": "rare" },
+	"leather":     { "name": "皮甲",   "def": 3, "hp": 15, "tag": "armor", "rarity": "common" },
+	"staff":       { "name": "法杖",   "magic": 6, "tag": "arcane", "rarity": "rare" },
+	"tome":        { "name": "魔典",   "magic": 4, "tag": "arcane", "rarity": "common" },
+	"holy_symbol": { "name": "圣徽",   "magic": 5, "tag": "holy",   "rarity": "rare" },
+	"amulet":      { "name": "护符",   "hp": 12, "def": 2, "tag": "vital", "rarity": "common" },
+	"charm":       { "name": "红宝石", "hp": 20, "tag": "vital",    "rarity": "rare" },
 
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
-	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit" },
-	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade" },
-	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit" },
+	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic" },
+	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare" },
+	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic" },
 
 	# ── 技能书（占格、不给属性；认职业；带回合冷却）──────────────────────────
 	# 技能书 = 把"技能"也做成背包物品：占格 → 和装备抢空间（带书=少带甲）。
 	# 职业由对应技能的 SkillTable.hero_class 决定（实验里按持有者职业过滤）。
-	"book_slash":    { "name": "斩击书", "tag": "skillbook", "skill_id": "slash",     "cd": 1 },
-	"book_cleave":   { "name": "横扫书", "tag": "skillbook", "skill_id": "cleave",    "cd": 2 },
-	"book_fireball": { "name": "火球书", "tag": "skillbook", "skill_id": "fireball",  "cd": 2 },
-	"book_icelance": { "name": "冰枪书", "tag": "skillbook", "skill_id": "ice_lance", "cd": 1 },
-	"book_heal":     { "name": "治疗书", "tag": "skillbook", "skill_id": "holy_heal", "cd": 1 },
-	"book_purify":   { "name": "净化书", "tag": "skillbook", "skill_id": "purify",    "cd": 2 },
+	"book_slash":    { "name": "斩击书", "tag": "skillbook", "skill_id": "slash",     "cd": 1, "rarity": "common" },
+	"book_cleave":   { "name": "横扫书", "tag": "skillbook", "skill_id": "cleave",    "cd": 2, "rarity": "rare" },
+	"book_fireball": { "name": "火球书", "tag": "skillbook", "skill_id": "fireball",  "cd": 2, "rarity": "rare" },
+	"book_icelance": { "name": "冰枪书", "tag": "skillbook", "skill_id": "ice_lance", "cd": 1, "rarity": "rare" },
+	"book_heal":     { "name": "治疗书", "tag": "skillbook", "skill_id": "holy_heal", "cd": 1, "rarity": "common" },
+	"book_purify":   { "name": "净化书", "tag": "skillbook", "skill_id": "purify",    "cd": 2, "rarity": "common" },
 }
 
 # ── 邻接协同规则 ──────────────────────────────────────────────────────────────

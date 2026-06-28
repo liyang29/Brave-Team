@@ -6,11 +6,13 @@ extends GutTest
 
 
 func test_create_reads_table() -> void:
+	# 对照表本身断言（数值调参不会让本测试失效）
+	var t: Dictionary = MonsterFactory.ENEMIES["wolf"]
 	var e: EnemyData = MonsterFactory.create("wolf")
-	assert_eq(e.entity_name, "野狼", "名字来自表")
-	assert_eq(e.base_max_hp, 56, "血来自表")
-	assert_eq(e.base_attack, 10, "攻来自表")
-	assert_eq(e.base_defense, 2, "防来自表")
+	assert_eq(e.entity_name, String(t["name"]), "名字来自表")
+	assert_eq(e.base_max_hp, int(t["hp"]), "血来自表")
+	assert_eq(e.base_attack, int(t["atk"]), "攻来自表")
+	assert_eq(e.base_defense, int(t["def"]), "防来自表")
 	assert_eq(e.preferred_row, "front", "默认前排")
 	assert_false(e.is_ranged, "默认非远程")
 	assert_eq(e.ai_type, EnemyData.AI_BASIC_ATTACK, "默认基础攻击 AI")

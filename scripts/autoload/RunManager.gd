@@ -178,13 +178,11 @@ func leave_village() -> void:
 	else:
 		_set_state(State.MAP)
 
-# 抽 n 个英雄池模板作候选（可重复职业；允许已在队的职业再来）。
+# 抽 n 个英雄池模板作候选（同一次不重复，避免同店出现两个同样的人）。
 func _roll_recruits(n: int) -> Array:
 	var ids: Array = HERO_TEMPLATES.keys()
-	var out: Array = []
-	for i in range(n):
-		out.append(ids[randi() % ids.size()])
-	return out
+	ids.shuffle()
+	return ids.slice(0, min(n, ids.size()))
 
 # 把新英雄放进第一个空站位格（优先后排 row1，再前排 row0）。
 func _place_in_empty_slot(hero) -> void:

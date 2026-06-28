@@ -77,10 +77,13 @@ static func simulate(party, enemy_data_list: Array) -> BattleResult:
 			if opponents.is_empty():
 				break
 
-			# 站位触及：硬模式按前排触及；软模式人人可达（站位只改伤害，见 _row_damage_mult）
+			# 站位触及：
+			#   soft_row：近战(非 can_reach_back)只能打对方前排；远程可打任何人（世界树式）。
+			#             伤害仍按 _row_damage_mult 修正。
+			#   reach   ：逐列掩护（其它实验用）。
 			var reachable: Array
 			if pos_mode == "soft_row":
-				reachable = opponents
+				reachable = _soft_reachable(unit, opponents)
 			else:
 				reachable = _get_reachable_opponents(unit, opponents)
 
@@ -412,6 +415,15 @@ static func _get_opponents(unit: BattleCombatant, hero_bcs: Array, enemy_bcs: Ar
 # 近战单位：可打「暴露」单位 = 所有前排 + 所在列没有存活前排掩护的后排。
 #   → 把脆皮后排摆在有肉盾的同一列才挡得住；摆在空列会被近战点穿。
 # 入参 opponents 已是存活列表；返回非空（全暴露则退化为全体）。
+# soft_row 触及：远程(can_reach_back)可打任何人；近战只能打对方前排。
+# 配合"前排全灭后排顶上"，近战永远有前排可打；对方无前排时退化为全体（兜底）。
+static func _soft_reachable(unit: BattleCombatant, opponents: Array) -> Array:
+	if unit.can_reach_back:
+		return opponents
+	var front: Array = opponents.filter(func(bc): return bc.row == "front")
+	return front if not front.is_empty() else opponents
+
+
 static func _get_reachable_opponents(unit: BattleCombatant, opponents: Array) -> Array:
 	if unit.can_reach_back:
 		return opponents

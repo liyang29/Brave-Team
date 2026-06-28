@@ -17,10 +17,11 @@ signal depth_changed(new_depth)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, VICTORY, GAME_OVER }
+enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, REST, VICTORY, GAME_OVER }
 
 const START_GOLD := 500
 const SHOP_STOCK_SIZE := 6
+const REST_HEAL_PCT := 0.5   # 泉水/休息点：全员回复最大血的比例（消耗战泄压阀）
 
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
@@ -73,13 +74,40 @@ func alive_party() -> Array:
 	return party.filter(func(h): return h.is_alive())
 
 
-## 进入当前节点：村庄 → 商店；其它 → 遭遇。
+## 进入当前节点：村庄 → 商店；泉水 → 休息；其它 → 遭遇。
 func enter_current_node() -> void:
-	if current_node().get("type", "") == "shop":
-		shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 按 rarity 随机上货
-		_set_state(State.SHOP)
+	match current_node().get("type", ""):
+		"shop":
+			shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 按 rarity 随机上货
+			_set_state(State.SHOP)
+		"rest":
+			_set_state(State.REST)
+		_:
+			_set_state(State.ENCOUNTER)
+
+
+## 泉水/休息：全员存活英雄回复 REST_HEAL_PCT 比例的最大血（钳到上限）。
+## 返回 [{ name, before, after, max }]，供界面展示回血前后。
+func rest_heal() -> Array:
+	var report: Array = []
+	for h in party:
+		if not h.is_alive():
+			continue
+		var mx: int = h.get_max_hp()
+		var before: int = h.current_hp
+		h.current_hp = min(mx, before + int(ceil(mx * REST_HEAL_PCT)))
+		report.append({ "name": h.entity_name, "before": before, "after": h.current_hp, "max": mx })
+	return report
+
+
+## 离开休息点 → 前进到下一节点。
+func leave_rest() -> void:
+	depth += 1
+	depth_changed.emit(depth)
+	if depth >= nodes.size():
+		_set_state(State.VICTORY)
 	else:
-		_set_state(State.ENCOUNTER)
+		_set_state(State.MAP)
 
 
 ## 商店购买：金币够且在售 → 扣钱、入库、下架。返回是否成功。
@@ -149,15 +177,17 @@ func _set_state(s: int) -> void:
 	state_changed.emit(s)
 
 
-# ── 起手名册（占位数值：现保持现状，低裸base 留到 Step 3 接背包时再调）─────────
+# ── 起手名册（Step 5：裸 base 压低，战力主要来自背包/商店/战利品）──────────────
 # 返回 Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]。
-# base 暂等于英雄当前占位数值（裸base 真相源）；grid 空（起手空背包，靠战利品）。
+# base = 英雄"光身"裸属性（裸base 真相源）；grid 空（起手空背包）。
+# 注：技能在 BackpackLoadout.build_party 里按背包技能书重置，故 _starter 的技能在
+#     跑局战斗中会被背包书覆盖（这里留着只是占位、不影响）。
 
 func _make_starter_roster() -> Array:
 	return [
-		_starter_entry(Hero.HeroClass.WARRIOR, "战士", 130, 16, 12, 8, 0, 60, ["slash"]),
-		_starter_entry(Hero.HeroClass.MAGE,    "法师", 70, 8, 4, 13, 19, 80, ["fireball"]),
-		_starter_entry(Hero.HeroClass.PRIEST,  "牧师", 85, 6, 7, 9, 16, 80, ["holy_heal", "purify"]),
+		_starter_entry(Hero.HeroClass.WARRIOR, "战士", 90, 6, 8, 9, 0, 40, ["slash"]),
+		_starter_entry(Hero.HeroClass.MAGE,    "法师", 55, 3, 3, 12, 5, 70, ["fireball"]),
+		_starter_entry(Hero.HeroClass.PRIEST,  "牧师", 65, 3, 4, 9, 5, 70, ["holy_heal", "purify"]),
 	]
 
 # 造一个名册条目：英雄 + 裸base 字典 + 空背包
@@ -195,15 +225,17 @@ func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 	return hero
 
 
-# ── 地图（占位：线性 3 战斗 + 1 魔王）────────────────────────────────────────
+# ── 地图（村庄 → 3 战斗 + 中途泉水 + 魔王）────────────────────────────────────
+# 敌人数值配合 Step 5 的低裸 base（战力靠背包）：第一版草稿，由平衡 harness + 试玩拧。
 
 func _build_map() -> Array:
 	return [
 		_node("shop", "村庄", [], 0),
-		_node("battle", "林间遭遇", [_e("野狼", 70, 12, 4, 9), _e("野狼", 70, 12, 4, 9)], 20),
-		_node("battle", "剧毒巢穴", [_e("毒虫", 55, 11, 3, 11, "back", true), _e("石卫", 120, 13, 9, 6)], 25),
-		_node("battle", "废墟伏击", [_e("强盗", 95, 15, 6, 10), _e("游侠", 70, 14, 5, 12, "back", true)], 30),
-		_node("boss",   "魔王",     [_e("魔王", 260, 22, 12, 10), _e("爪牙", 90, 14, 6, 9)], 100),
+		_node("battle", "林间遭遇", [_e("野狼", 56, 10, 2, 9), _e("野狼", 56, 10, 2, 9)], 20),
+		_node("battle", "剧毒巢穴", [_e("毒虫", 45, 8, 1, 11, "back", true), _e("石卫", 93, 10, 7, 6)], 25),
+		_node("rest",   "泉水", [], 0),
+		_node("battle", "废墟伏击", [_e("强盗", 78, 12, 4, 10), _e("游侠", 60, 11, 2, 12, "back", true)], 30),
+		_node("boss",   "魔王",     [_e("魔王", 222, 18, 10, 10), _e("爪牙", 84, 12, 4, 9)], 100),
 	]
 
 func _node(type: String, nm: String, enemies: Array, g: int) -> Dictionary:

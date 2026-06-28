@@ -5,14 +5,18 @@ extends GutTest
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-# 过一个节点：村庄→直接离开；战斗→胜利(若进 DRAFT 则用 keep 完成 draft)前进。
+# 过一个节点：村庄→离开；泉水→回血并离开；战斗→胜利(若进 DRAFT 用 keep 完成)前进。
 func _advance(keep: Array = []) -> void:
-	if RunManager.current_node().get("type") == "shop":
-		RunManager.leave_shop()
-		return
-	RunManager.resolve_encounter(true)
-	if RunManager.state == RunManager.State.DRAFT:
-		RunManager.finish_draft(keep)
+	match RunManager.current_node().get("type"):
+		"shop":
+			RunManager.leave_shop()
+		"rest":
+			RunManager.rest_heal()
+			RunManager.leave_rest()
+		_:
+			RunManager.resolve_encounter(true)
+			if RunManager.state == RunManager.State.DRAFT:
+				RunManager.finish_draft(keep)
 
 
 func test_start_run_sets_up_state() -> void:
@@ -73,8 +77,8 @@ func test_default_formation_warrior_front() -> void:
 func test_base_captures_naked_stats() -> void:
 	RunManager.start_run()
 	var w_base: Dictionary = RunManager.roster[0]["base"]
-	assert_eq(int(w_base["hp"]), 130, "战士裸base血=占位 130")
-	assert_eq(int(w_base["atk"]), 16, "战士裸base攻=占位 16")
+	assert_eq(int(w_base["hp"]), 90, "战士裸base血=低值 90")
+	assert_eq(int(w_base["atk"]), 6, "战士裸base攻=低值 6")
 
 func test_backpack_state_persists_across_nodes() -> void:
 	RunManager.start_run()
@@ -163,3 +167,45 @@ func test_leave_shop_advances_to_first_battle() -> void:
 	assert_eq(RunManager.depth, 1, "离开村庄 → 前进到第 1 节点")
 	assert_eq(RunManager.state, RunManager.State.MAP, "回到地图")
 	assert_eq(RunManager.current_node().get("type"), "battle", "第 1 节点是战斗")
+
+
+# ── 泉水 / 休息点 ─────────────────────────────────────────────────────────────
+
+func _goto_rest() -> void:
+	RunManager.start_run()
+	RunManager.leave_shop()   # →1 林间
+	_advance()                # →2 剧毒
+	_advance()                # →3 泉水
+
+func test_node_3_is_rest() -> void:
+	_goto_rest()
+	assert_eq(RunManager.current_node().get("type"), "rest", "第 3 节点是泉水")
+
+func test_enter_rest_sets_state() -> void:
+	_goto_rest()
+	RunManager.enter_current_node()
+	assert_eq(RunManager.state, RunManager.State.REST, "进泉水 → REST 状态")
+
+func test_rest_heals_capped() -> void:
+	RunManager.start_run()
+	var h = RunManager.party[0]
+	h.current_hp = 1
+	var mx: int = h.get_max_hp()
+	RunManager.rest_heal()
+	var expected: int = min(mx, 1 + int(ceil(mx * RunManager.REST_HEAL_PCT)))
+	assert_eq(h.current_hp, expected, "回复 50%% 最大血（钳到上限）")
+	assert_gt(h.current_hp, 1, "确实回了血")
+
+func test_rest_does_not_revive_dead() -> void:
+	RunManager.start_run()
+	var h = RunManager.party[0]
+	h.current_hp = 0
+	RunManager.rest_heal()
+	assert_eq(h.current_hp, 0, "阵亡的不被泉水复活")
+
+func test_leave_rest_advances() -> void:
+	_goto_rest()
+	RunManager.enter_current_node()
+	RunManager.leave_rest()
+	assert_eq(RunManager.depth, 4, "离开泉水 → 第 4 节点")
+	assert_eq(RunManager.current_node().get("type"), "battle", "第 4 节点是战斗（废墟）")

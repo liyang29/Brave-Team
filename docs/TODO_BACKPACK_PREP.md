@@ -46,12 +46,8 @@
 - **✅ Step 3（已完成）抽 `BackpackPrepPanel` + Encounter 用它**：共享编辑组件 `scripts/ui/BackpackPrepPanel.gd`（VBoxContainer，按引用操作 roster/owned_items/squad_slots）。实验场景 + Encounter 都改用它。Encounter 开战前嵌入 → 调 `build_party(full_heal=false)` 钳血 → simulate → resolve。配 `test_backpack_prep_panel`（放入/退回/校验）+ RunManager 端到端战斗路径测试。
   - ~~DEBUG 起手种子~~ → **Step 4 已删，库存改回空 `{}`**。
 - **✅ Step 4（已完成）战利品 draft**：ITEMS 加 `rarity`（普通/稀有/史诗）+ `scripts/systems/LootTable.gd`（权重 65/27/8 加权不重复抽）。RunManager 加 `State.DRAFT` + `pending_draft` + `finish_draft()`：普通胜利 → 抽 3 件进 DRAFT；魔王胜 → 直接通关不抽。新建 `scenes/run/Draft.tscn`+`DraftScreen.gd`（三选二，点丢 1 留 2 进库存）。已删 debug 种子、库存改回空。配 `test_loot_table` + RunManager draft 用例。共 97/97 绿。
-- **Step 5 首战平衡**：调第一个节点敌人到"裸队险胜"，跑几把验证开局不卡死。
-- **Step 6 休息/泉水回血点（与战利品同期，不能拖到后面）**：在节点地图插入非战斗的回血节点。
-  - **为什么和战利品绑一起做**：我们定了 ① **不回血（纯消耗战）**，整局 HP 只降不升，3 战 + 魔王全程不回血会非常残酷、大概率没到魔王就团灭。**回血点是消耗战的泄压阀，是必需品**，没它"不回血"这条决定就站不住。
-  - 数据结构已支持：节点 `type` 现为 `"battle"`/`"boss"`，加 `"rest"` 即可；RunManager `enter_current_node` 按 type 分流（战斗→Encounter，休息→回血界面）。
-  - 回血方式待定（下次聊）：固定回 X% / 花金币回 / 限次。MVP 建议先**固定回一定比例**最简单。
-  - 保持轻：旅程层只做轻策略纹理，别做成第二个烧脑系统（METHODOLOGY「只做深一个系统」）。
+- **✅ Step 5（已完成）降 base + 平衡**：裸 base 降到实验低值（战90/6/8、法55/3/5、牧65/3/5），战力主要靠背包。新增 `test_balance.gd` harness（模拟好/中庸/烂 build 跑整局，输出通关率）。调敌人到中等难度：**好build 20/20 · 中庸 ~12/20 · 烂build 0/20**——好build稳赢、中庸有真风险（优化有意义）、烂build必败；魔王是协同/优化的检验门槛。
+- **✅ Step 6（已完成）休息/泉水回血点**：节点类型 `rest` + `State.REST` + `Rest` 场景；进泉水全员回 50% 最大血（`REST_HEAL_PCT`，钳上限、不复活）。地图：村庄→林间→剧毒→**泉水**→废墟→魔王。消耗战泄压阀，整局张弛有度。
 
 > 验证目标（火花）：玩家搭出的 build 在跑局里真的起作用 + "丢哪件/放谁"的 draft 抉择有意思 + 消耗战配回血点后整局张弛有度（不是必死）。
 

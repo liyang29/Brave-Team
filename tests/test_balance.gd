@@ -1,0 +1,83 @@
+extends GutTest
+
+# ─────────────────────────────────────────────────────────────────────────────
+# test_balance — 跑局平衡 harness（Step 5）
+#
+# 模拟"好 build vs 烂 build"跑完整条线（HP 跨节点累积、泉水回血、build_party 钳血），
+# 输出通关率。目标：中等难度——好 build 多数能通关、烂 build 多数过不去。
+# 数值不达标就回 RunManager._build_map 拧敌人，再跑本测试。
+# ─────────────────────────────────────────────────────────────────────────────
+
+const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const TRIALS := 20
+
+
+# 好 build：协同相邻 + 放对人 + 带本职技能书
+func _good_grids() -> Array:
+	return [
+		# 战士：开刃(剑+磨刀石) + 重装(盾+甲) + 斩击书
+		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "book_slash",
+		  Vector2i(0,1): "shield", Vector2i(1,1): "chainmail" },
+		# 法师：共鸣(法杖+魔典) + 火球书
+		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome", Vector2i(2,0): "book_fireball" },
+		# 牧师：生机(护符+红宝石) + 圣徽 + 治疗书
+		{ Vector2i(0,0): "holy_symbol", Vector2i(2,0): "book_heal",
+		  Vector2i(0,1): "amulet", Vector2i(1,1): "charm" },
+	]
+
+# 中庸 build：放对人、有装备有技能书，但没凑相邻协同（衡量"协同到底多关键"）
+func _ok_grids() -> Array:
+	return [
+		{ Vector2i(0,0): "iron_sword", Vector2i(2,0): "chainmail", Vector2i(2,1): "book_slash" },
+		{ Vector2i(0,0): "staff", Vector2i(2,0): "book_fireball" },
+		{ Vector2i(0,0): "amulet", Vector2i(2,0): "book_heal" },
+	]
+
+# 烂 build：放错人、无协同、无对职业技能书
+func _bad_grids() -> Array:
+	return [
+		{ Vector2i(0,0): "staff" },        # 战士拿法杖（魔力对物理战士没用）
+		{ Vector2i(0,0): "iron_sword" },   # 法师拿剑（攻击对法系没用）
+		{ Vector2i(0,0): "shield" },       # 牧师只有个盾
+	]
+
+
+# 跑一整局，返回是否通关（魔王也打过）
+func _run_once(grids: Array) -> bool:
+	RunManager.start_run()
+	for i in range(grids.size()):
+		RunManager.roster[i]["grid"] = grids[i].duplicate()
+	for d in range(RunManager.nodes.size()):
+		var node: Dictionary = RunManager.nodes[d]
+		match node.get("type"):
+			"shop":
+				pass
+			"rest":
+				RunManager.rest_heal()
+			_:
+				var alive: Array = RunManager.roster.filter(func(e): return e["hero"].is_alive())
+				if alive.is_empty():
+					return false
+				var party: Party = Loadout.build_party(alive, RunManager.squad_slots, false)
+				var result: BattleResult = BattleSimulator.simulate(party, node.get("enemies", []))
+				if not result.party_won:
+					return false
+	return true
+
+
+func _win_rate(grids: Array) -> int:
+	var wins := 0
+	for t in range(TRIALS):
+		if _run_once(grids):
+			wins += 1
+	return wins
+
+
+func test_good_build_beats_bad_build() -> void:
+	var good := _win_rate(_good_grids())
+	var ok := _win_rate(_ok_grids())
+	var bad := _win_rate(_bad_grids())
+	gut.p("通关率  好build %d/%d  ·  中庸 %d/%d  ·  烂build %d/%d" % [good, TRIALS, ok, TRIALS, bad, TRIALS])
+	assert_gt(good, bad, "好 build 通关率应明显高于烂 build")
+	assert_gte(good, int(TRIALS * 0.5), "好 build 至少一半能通关（不是必死）")
+	assert_lte(bad, int(TRIALS * 0.5), "烂 build 多数过不去（build 要有意义）")

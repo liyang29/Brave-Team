@@ -81,7 +81,8 @@
 | 文件 | 职责 |
 |------|------|
 | `HeroFactory.gd` | 按职业造英雄：数据驱动属性/技能池(const dict) + 注入策略。`create(cls)` / `create_random()`。⚠️ `CLASS_STRATEGIES` 字典是死数据（`_inject_strategy` 实际用 match） |
-| `EnemyAIFactory.gd` | 按 `ai_type` 字符串造 `CombatStrategy`。**只造 AI，不造怪物数据**（无 MonsterFactory，EnemyData 目前在 RunManager/实验里内联手搓） |
+| `MonsterFactory.gd` | 按 id 造怪物：`ENEMIES` const 表（加怪=加一行）→ `create(id, name_override)` 吐 `EnemyData`；`create_group(ids)` 批量。地图/实验都经它造怪（不再内联手搓） |
+| `EnemyAIFactory.gd` | 按 `ai_type` 字符串造 `CombatStrategy`（只造 AI 策略，怪物数据归 MonsterFactory） |
 
 #### `scripts/systems/run/`
 | 路径 | 属性 | 说明 |
@@ -139,4 +140,5 @@
 ## 已知待整理（与本结构相关）
 - `entities/items/`（Resource 物品体系）与 `experiments/BackpackModel.gd`（dict 物品体系）**未打通**，未来需定夺统一方案。
 - `HeroFactory.CLASS_STRATEGIES` 死数据待清理。
-- 无 MonsterFactory：`EnemyData` 在 `RunManager._e()` 与 `BackpackExperiment._enemy()` 内联重复，未来可抽工厂合并。
+- ~~无 MonsterFactory~~ → ✅ 已抽 `MonsterFactory` + `ENEMIES` 表，内联怪物已收编。
+- 后期内容扩展（更多怪/Boss/节点/地图）方案见 `docs/SCALING_ROADMAP.md`。

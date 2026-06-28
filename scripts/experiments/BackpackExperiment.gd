@@ -83,27 +83,12 @@ func _build_heroes() -> void:
 
 
 func _build_enemies() -> Array:
-	# 一队需要"配装到位"才打得过的敌人（前排蛮兵 + 后排巫师）
+	# 一队需要"配装到位"才打得过的敌人（前排蛮兵 + 后排巫师），数值见 MonsterFactory
 	return [
-		_enemy("蛮兵·甲", 90, 15, 6, 8, "front", false, EnemyData.AI_AGGRESSIVE),
-		_enemy("蛮兵·乙", 90, 15, 6, 8, "front", false, EnemyData.AI_AGGRESSIVE),
-		_enemy("黑巫师", 60, 17, 3, 11, "back", true, EnemyData.AI_SPELLCASTER),
+		MonsterFactory.create("brute", "蛮兵·甲"),
+		MonsterFactory.create("brute", "蛮兵·乙"),
+		MonsterFactory.create("dark_mage"),
 	]
-
-
-func _enemy(nm: String, hp: int, atk: int, def_v: int, spd: int, prow: String,
-			ranged: bool, ai: String) -> EnemyData:
-	var e: EnemyData = EnemyData.new()
-	e.entity_name = nm
-	e.base_max_hp = hp
-	e.base_attack = atk
-	e.base_defense = def_v
-	e.base_speed = spd
-	e.base_magic = atk
-	e.ai_type = ai
-	e.preferred_row = prow
-	e.is_ranged = ranged
-	return e
 
 
 # ── UI 构建 ───────────────────────────────────────────────────────────────────

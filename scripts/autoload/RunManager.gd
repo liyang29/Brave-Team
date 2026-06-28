@@ -226,31 +226,17 @@ func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 
 
 # ── 地图（村庄 → 3 战斗 + 中途泉水 + 魔王）────────────────────────────────────
-# 敌人数值配合 Step 5 的低裸 base（战力靠背包）：第一版草稿，由平衡 harness + 试玩拧。
+# 怪物数值见 MonsterFactory.ENEMIES（加怪=加一行）；难度由平衡 harness + 试玩拧。
 
 func _build_map() -> Array:
 	return [
 		_node("shop", "村庄", [], 0),
-		_node("battle", "林间遭遇", [_e("野狼", 56, 10, 2, 9), _e("野狼", 56, 10, 2, 9)], 20),
-		_node("battle", "剧毒巢穴", [_e("毒虫", 45, 8, 1, 11, "back", true), _e("石卫", 93, 10, 7, 6)], 25),
+		_node("battle", "林间遭遇", MonsterFactory.create_group(["wolf", "wolf"]), 20),
+		_node("battle", "剧毒巢穴", MonsterFactory.create_group(["venom_bug", "stone_guard"]), 25),
 		_node("rest",   "泉水", [], 0),
-		_node("battle", "废墟伏击", [_e("强盗", 78, 12, 4, 10), _e("游侠", 60, 11, 2, 12, "back", true)], 30),
-		_node("boss",   "魔王",     [_e("魔王", 222, 18, 10, 10), _e("爪牙", 84, 12, 4, 9)], 100),
+		_node("battle", "废墟伏击", MonsterFactory.create_group(["bandit", "ranger"]), 30),
+		_node("boss",   "魔王",     MonsterFactory.create_group(["demon_lord", "claw_minion"]), 100),
 	]
 
 func _node(type: String, nm: String, enemies: Array, g: int) -> Dictionary:
 	return { "type": type, "name": nm, "enemies": enemies, "gold": g }
-
-func _e(nm: String, hp: int, atk: int, def_v: int, spd: int,
-		prow: String = "front", ranged: bool = false) -> EnemyData:
-	var en: EnemyData = EnemyData.new()
-	en.entity_name = nm
-	en.base_max_hp = hp
-	en.base_attack = atk
-	en.base_defense = def_v
-	en.base_speed = spd
-	en.base_magic = atk
-	en.preferred_row = prow
-	en.is_ranged = ranged
-	en.ai_type = EnemyData.AI_BASIC_ATTACK
-	return en

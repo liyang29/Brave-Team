@@ -102,12 +102,17 @@
 | `GridExperiment.gd` | 视觉层，`extends Control` | 网格站位 + 逐列掩护（硬触及）实验 |
 | `PositionExperiment.gd` | 视觉层，`extends Control` | 2 排站位（硬触及）实验 |
 
-### `scripts/ui/`（视觉层，皆 `extends Control`，无 class_name）
+### `scripts/ui/`（视觉层，皆 `extends Control`/容器，无 class_name）
 | 文件 | 职责 |
 |------|------|
-| `TitleScreen.gd` | 入口标题（开始冒险/实验/退出） |
-| `RunMap.gd` | 线性节点地图 + 进度/队伍状态 + 胜负横幅 |
-| `Encounter.gd` | 遭遇：敌我预览 → 开战(BattleSimulator 软站位) → 结果 → 回报 RunManager。**背包 prep 待接入** |
+| `TitleScreen.gd` | 入口标题（开始冒险直接进村庄/实验/退出） |
+| `RunMap.gd` | 线性节点地图 + 进度/队伍状态 + 胜负横幅；按节点类型路由场景 |
+| `Encounter.gd` | 遭遇：敌人预览 + 我方HP + **背包/站位编辑(BackpackPrepPanel)** → 开战(钳血) → 结果 → 回报 |
+| `VillageScreen.gd` | 村庄：队伍列表 + 招募 + 商店（一屏；须招 ≥1 才能出发） |
+| `RestScreen.gd` | 泉水：全员回 50% 血 |
+| `DraftScreen.gd` | 战利品三选二 |
+| `BackpackPrepPanel.gd` | 背包/站位编辑组件（VBoxContainer，拖放；实验+遭遇共用） |
+| `DragSlot.gd` | 可拖放槽位（PanelContainer，实现 Godot 拖放三虚函数） |
 
 ---
 
@@ -116,7 +121,10 @@
 |------|------|
 | `scenes/ui/TitleScreen.tscn` | **主场景/入口** |
 | `scenes/run/RunMap.tscn` | 节点地图 |
-| `scenes/run/Encounter.tscn` | 遭遇 |
+| `scenes/run/Encounter.tscn` | 遭遇（含背包 prep） |
+| `scenes/run/Village.tscn` | 村庄（商店+招募+队伍列表） |
+| `scenes/run/Rest.tscn` | 泉水回血 |
+| `scenes/run/Draft.tscn` | 战利品三选二 |
 | `scenes/experiments/BackpackExperiment.tscn` | **主玩法核心实验** |
 | `scenes/experiments/GridExperiment.tscn` | 网格站位实验 |
 | `scenes/experiments/PositionExperiment.tscn` | 站位实验 |

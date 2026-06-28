@@ -45,12 +45,24 @@ func _bad_grids() -> Array:
 # 跑一整局，返回是否通关（魔王也打过）
 func _run_once(grids: Array) -> bool:
 	RunManager.start_run()
+	# 起手空队 → 直接组一支固定测试队（战/法/牧）并装上 build
+	RunManager.roster = [
+		RunManager.make_hero_entry("warrior"),
+		RunManager.make_hero_entry("mage"),
+		RunManager.make_hero_entry("priest"),
+	]
+	RunManager.party = RunManager.roster.map(func(e): return e["hero"])
+	RunManager.squad_slots = {
+		Vector2i(0, 0): RunManager.roster[0]["hero"],
+		Vector2i(0, 1): RunManager.roster[1]["hero"],
+		Vector2i(1, 1): RunManager.roster[2]["hero"],
+	}
 	for i in range(grids.size()):
 		RunManager.roster[i]["grid"] = grids[i].duplicate()
 	for d in range(RunManager.nodes.size()):
 		var node: Dictionary = RunManager.nodes[d]
 		match node.get("type"):
-			"shop", "tavern":
+			"village":
 				pass
 			"rest":
 				RunManager.rest_heal()

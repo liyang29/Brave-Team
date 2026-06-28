@@ -11,7 +11,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_RUNMAP   := "res://scenes/run/RunMap.tscn"
-const SCENE_SHOP     := "res://scenes/run/Shop.tscn"
+const SCENE_VILLAGE  := "res://scenes/run/Village.tscn"
 const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
 const SCENE_BACKPACK := "res://scenes/experiments/BackpackExperiment.tscn"
 const SCENE_GRID     := "res://scenes/experiments/GridExperiment.tscn"
@@ -81,7 +81,7 @@ func _on_start() -> void:
 	RunManager.start_run()
 	RunManager.enter_current_node()
 	var node: Dictionary = RunManager.current_node()
-	_goto(SCENE_SHOP if node.get("type") == "shop" else SCENE_ENCOUNTER)
+	_goto(SCENE_VILLAGE if node.get("type") == "village" else SCENE_ENCOUNTER)
 
 
 func _goto(scene_path: String) -> void:

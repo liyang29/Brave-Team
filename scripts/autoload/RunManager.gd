@@ -17,7 +17,7 @@ signal depth_changed(new_depth)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, REST, TAVERN, VICTORY, GAME_OVER }
+enum State { NONE, MAP, ENCOUNTER, DRAFT, VILLAGE, REST, VICTORY, GAME_OVER }
 
 const START_GOLD := 500
 const SHOP_STOCK_SIZE := 6
@@ -35,8 +35,8 @@ const HERO_TEMPLATES: Dictionary = {
 	"rogue":   { "cls": Hero.HeroClass.ROGUE,   "name": "盗贼", "hp": 70, "atk": 7, "def": 5, "spd": 16, "magic": 0, "mp": 50 },
 	"archer":  { "cls": Hero.HeroClass.ARCHER,  "name": "猎人", "hp": 80, "atk": 7, "def": 6, "spd": 12, "magic": 0, "mp": 50 },
 }
-# 起手队伍（从英雄池取这几个）
-const STARTER_TEAM: Array = ["warrior", "mage", "priest"]
+# 起手队伍：空——在起手村庄招募组建（决定：初始空队）。
+const STARTER_TEAM: Array = []
 
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
@@ -96,14 +96,12 @@ func alive_party() -> Array:
 ## 进入当前节点：村庄 → 商店；泉水 → 休息；其它 → 遭遇。
 func enter_current_node() -> void:
 	match current_node().get("type", ""):
-		"shop":
-			shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 按 rarity 随机上货
-			_set_state(State.SHOP)
+		"village":
+			shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 商店：按 rarity 随机上货
+			tavern_offers = _roll_recruits(TAVERN_OFFERS)        # 招募：随机候选
+			_set_state(State.VILLAGE)
 		"rest":
 			_set_state(State.REST)
-		"tavern":
-			tavern_offers = _roll_recruits(TAVERN_OFFERS)
-			_set_state(State.TAVERN)
 		_:
 			_set_state(State.ENCOUNTER)
 
@@ -146,18 +144,7 @@ func buy_item(item_id: String) -> bool:
 	return true
 
 
-## 离开商店 → 前进到下一节点（商店不会是最后一个节点）。
-func leave_shop() -> void:
-	shop_stock = []
-	depth += 1
-	depth_changed.emit(depth)
-	if depth >= nodes.size():
-		_set_state(State.VICTORY)
-	else:
-		_set_state(State.MAP)
-
-
-# ── 酒馆 / 招募 ───────────────────────────────────────────────────────────────
+# ── 招募 ──────────────────────────────────────────────────────────────────────
 
 ## 是否还能再招（未满队）
 func party_is_full() -> bool:
@@ -180,8 +167,9 @@ func recruit(template_id: String) -> bool:
 	_place_in_empty_slot(entry["hero"])
 	return true
 
-## 离开酒馆 → 前进到下一节点。
-func leave_tavern() -> void:
+## 离开村庄 → 前进到下一节点（商店+招募都在村庄；村庄不会是最后一个节点）。
+func leave_village() -> void:
+	shop_stock = []
 	tavern_offers = []
 	depth += 1
 	depth_changed.emit(depth)
@@ -305,9 +293,9 @@ func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 
 func _build_map() -> Array:
 	return [
-		_node("shop", "村庄", [], 0),
+		_node("village", "村庄", [], 0),
 		_node("battle", "林间遭遇", MonsterFactory.create_group(["wolf", "wolf"]), 20),
-		_node("tavern", "酒馆", [], 0),
+		_node("village", "村镇", [], 0),
 		_node("battle", "剧毒巢穴", MonsterFactory.create_group(["venom_bug", "stone_guard"]), 25),
 		_node("rest",   "泉水", [], 0),
 		_node("battle", "废墟伏击", MonsterFactory.create_group(["bandit", "ranger"]), 30),

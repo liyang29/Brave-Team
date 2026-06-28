@@ -3,41 +3,36 @@ extends VBoxContainer
 # ─────────────────────────────────────────────────────────────────────────────
 # BackpackPrepPanel — 背包/站位编辑组件（背包实验 + 跑局遭遇 prep 共用）
 #
-# 只负责「编辑」：物品池 + 站位板 + 每人背包格子 + 实时属性显示。
-# 开战按钮 / 战斗结果留给宿主（实验场景 / Encounter 各一套，开战逻辑不同）。
+# 拖放交互（Godot 原生拖放，经 DragSlot 委托回本面板）：
+#   公共装备栏(pool) ↔ 背包格(bag) ↔ 背包格：拖物品（放到占用格=交换）
+#   站位格(squad) ↔ 站位格：拖英雄（放到占用格=交换）
+#   物品只能进 bag/pool；英雄只能进 squad（载荷带 type 防错放）。
 #
-# 操作"注入进来的状态"（按引用，直接改宿主的数据，无需回写）：
+# 只负责"编辑"；开战/结果留给宿主。按引用操作宿主的 roster/owned_items/squad_slots。
 #   roster      : Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]
-#   owned_items : { item_id: 数量 }（拥有但未摆入背包的库存）
+#   owned_items : { item_id: 数量 }（公共装备栏库存；数量到 0 自动移除该格）
 #   squad_slots : { Vector2i(col,row): Hero }  row0 前排 / row1 后排
-#
-# 故意不带 class_name（preload 引入），同项目其它脚本一致。
 # ─────────────────────────────────────────────────────────────────────────────
 
 const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const DragSlot = preload("res://scripts/ui/DragSlot.gd")
 
 const BAG_COLS := 3
 const BAG_ROWS := 2
 
-# 注入的状态（引用宿主对象）
+# 注入状态（引用宿主对象）
 var _roster: Array = []
 var _pool: Dictionary = {}
 var _squad_slots: Dictionary = {}
 
-# 选择态
-var _selected_item: String = ""
-var _selected_slot = null
-
 # UI 节点引用
-var _pool_box: FlowContainer
-var _pool_buttons: Dictionary = {}      # item_id -> Button
-var _slot_buttons: Dictionary = {}      # Vector2i -> Button
-var _cell_buttons: Array = []           # 每英雄一份 { Vector2i: Button }
-var _stat_labels: Array = []            # 每英雄一个 Label
+var _pool_box: HFlowContainer
+var _squad_ui: Dictionary = {}     # Vector2i -> DragSlot
+var _bag_slots: Array = []         # 每英雄一份 { Vector2i: DragSlot }
+var _stat_labels: Array = []       # 每英雄一个 Label
 
 
-## 注入状态并构建 UI。宿主在把本组件加入场景后调用。
 func setup(roster: Array, owned_items: Dictionary, squad_slots: Dictionary) -> void:
 	_roster = roster
 	_pool = owned_items
@@ -49,46 +44,40 @@ func setup(roster: Array, owned_items: Dictionary, squad_slots: Dictionary) -> v
 
 # ── 给宿主用的校验/操作助手 ───────────────────────────────────────────────────
 
-## 前排至少有一个人（世界树规则）
 func has_front_row() -> bool:
 	for cell in _squad_slots:
 		if _squad_slots[cell] != null and cell.y == 0:
 			return true
 	return false
 
-## 是否至少摆了一件装备
 func any_item_placed() -> bool:
 	for entry in _roster:
 		if not entry["grid"].is_empty():
 			return true
 	return false
 
-## 把所有已摆放的物品退回库存（"全部取回"按钮用）
 func return_all_to_pool() -> void:
 	for entry in _roster:
 		var grid: Dictionary = entry["grid"]
 		for cell in grid.keys():
-			var id: String = grid[cell]
-			_pool[id] = int(_pool.get(id, 0)) + 1
+			_owned_add(grid[cell], 1)
 		grid.clear()
-	_selected_item = ""
 	refresh()
 
 
 # ── UI 构建 ───────────────────────────────────────────────────────────────────
 
 func _build_ui() -> void:
-	add_child(_section("物品池（点选 → 再点背包格子放入；点已放入的格子可取回）"))
-	_pool_box = FlowContainer.new()
+	add_child(_section("公共装备栏（拖到下面某人背包格；空着的格子从背包拖回来）"))
+	_pool_box = HFlowContainer.new()
 	_pool_box.custom_minimum_size = Vector2(700, 0)
 	add_child(_pool_box)
-	_build_pool()
 
-	add_child(_section("队伍站位（点一个人 → 点另一格 移动/交换 · 前排挨打、后排被保护）"))
+	add_child(_section("队伍站位（直接把人拖到另一格 · 前排挨打、后排被保护）"))
 	add_child(_build_squad_board())
 
-	add_child(_section("我方小队（每人 3×2 背包）"))
-	var heroes_row: HBoxContainer = HBoxContainer.new()
+	add_child(_section("我方小队（每人 3×2 背包 · 物品可在背包间互拖）"))
+	var heroes_row := HBoxContainer.new()
 	heroes_row.add_theme_constant_override("separation", 16)
 	for i in range(_roster.size()):
 		heroes_row.add_child(_build_hero_panel(i))
@@ -96,49 +85,36 @@ func _build_ui() -> void:
 
 
 func _section(t: String) -> Label:
-	var l: Label = Label.new()
+	var l := Label.new()
 	l.text = t
 	l.modulate = Color(0.65, 0.7, 0.8)
 	return l
 
 
-# 物品池按钮一次性建好（一次编辑期内 key 集固定：库存 keys ∪ 已摆放 id）。
-# 不在 refresh 里重建，避免"按下池按钮→refresh 释放该按钮"的自毁。
-func _build_pool() -> void:
-	var ids: Dictionary = {}
-	for id in _pool:
-		ids[id] = true
-	for entry in _roster:
-		for cell in entry["grid"]:
-			ids[entry["grid"][cell]] = true
-	var sorted_ids: Array = ids.keys()
-	sorted_ids.sort()
-	for item_id in sorted_ids:
-		var btn: Button = Button.new()
-		btn.pressed.connect(_on_pool_pressed.bind(item_id))
-		_pool_buttons[item_id] = btn
-		_pool_box.add_child(btn)
+func _new_slot(kind: String, key, size: Vector2) -> Control:
+	var slot := DragSlot.new()
+	slot.panel = self
+	slot.kind = kind
+	slot.key = key
+	slot.custom_minimum_size = size
+	return slot
 
 
 func _build_squad_board() -> Control:
-	var box: VBoxContainer = VBoxContainer.new()
+	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
-
-	var grid: GridContainer = GridContainer.new()
+	var grid := GridContainer.new()
 	grid.columns = 3
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 6)
 	for row in range(2):
 		for col in range(3):
 			var cell := Vector2i(col, row)
-			var btn: Button = Button.new()
-			btn.custom_minimum_size = Vector2(120, 40)
-			btn.pressed.connect(_on_slot_pressed.bind(cell))
-			_slot_buttons[cell] = btn
-			grid.add_child(btn)
+			var slot := _new_slot("squad", cell, Vector2(120, 40))
+			_squad_ui[cell] = slot
+			grid.add_child(slot)
 	box.add_child(grid)
-
-	var legend: Label = Label.new()
+	var legend := Label.new()
 	legend.modulate = Color(0.6, 0.6, 0.6)
 	legend.text = "世界树式站位：后排受物理伤×0.7（更安全）、后排近战输出×0.5（远程/法术不受影响）；前排至少留1人，前排全灭后排自动顶上"
 	box.add_child(legend)
@@ -147,15 +123,15 @@ func _build_squad_board() -> Control:
 
 func _build_hero_panel(index: int) -> Control:
 	var entry: Dictionary = _roster[index]
-	var box: VBoxContainer = VBoxContainer.new()
+	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
 
-	var head: Label = Label.new()
-	head.text = entry["hero"].entity_name   # 前/后排由站位板决定
+	var head := Label.new()
+	head.text = entry["hero"].entity_name
 	head.add_theme_font_size_override("font_size", 16)
 	box.add_child(head)
 
-	var grid: GridContainer = GridContainer.new()
+	var grid := GridContainer.new()
 	grid.columns = BAG_COLS
 	grid.add_theme_constant_override("h_separation", 4)
 	grid.add_theme_constant_override("v_separation", 4)
@@ -163,16 +139,13 @@ func _build_hero_panel(index: int) -> Control:
 	for row in range(BAG_ROWS):
 		for col in range(BAG_COLS):
 			var cell := Vector2i(col, row)
-			var btn: Button = Button.new()
-			btn.custom_minimum_size = Vector2(96, 44)
-			btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			btn.pressed.connect(_on_cell_pressed.bind(index, cell))
-			cells[cell] = btn
-			grid.add_child(btn)
-	_cell_buttons.append(cells)
+			var slot := _new_slot("bag", { "hero_index": index, "cell": cell }, Vector2(96, 44))
+			cells[cell] = slot
+			grid.add_child(slot)
+	_bag_slots.append(cells)
 	box.add_child(grid)
 
-	var stat: Label = Label.new()
+	var stat := Label.new()
 	stat.custom_minimum_size = Vector2(200, 0)
 	stat.modulate = Color(0.8, 0.9, 0.8)
 	_stat_labels.append(stat)
@@ -181,88 +154,50 @@ func _build_hero_panel(index: int) -> Control:
 	return box
 
 
-# ── 交互 ──────────────────────────────────────────────────────────────────────
-
-func _on_pool_pressed(item_id: String) -> void:
-	if int(_pool.get(item_id, 0)) <= 0:
-		return
-	_selected_item = item_id
-	refresh()
-
-
-func _on_cell_pressed(hero_index: int, cell: Vector2i) -> void:
-	var grid: Dictionary = _roster[hero_index]["grid"]
-	if grid.has(cell):
-		# 取回到库存
-		var returned: String = grid[cell]
-		grid.erase(cell)
-		_pool[returned] = int(_pool.get(returned, 0)) + 1
-	elif _selected_item != "":
-		if int(_pool.get(_selected_item, 0)) <= 0:
-			return
-		grid[cell] = _selected_item
-		_pool[_selected_item] = int(_pool[_selected_item]) - 1
-		if int(_pool[_selected_item]) <= 0:
-			_selected_item = ""
-	refresh()
-
-
-func _on_slot_pressed(cell: Vector2i) -> void:
-	var occupant = _squad_slots.get(cell)
-	if _selected_slot == null:
-		if occupant != null:
-			_selected_slot = cell
-	elif _selected_slot == cell:
-		_selected_slot = null
-	else:
-		var sel_hero = _squad_slots.get(_selected_slot)
-		if occupant != null:
-			_squad_slots[_selected_slot] = occupant   # 交换
-		else:
-			_squad_slots.erase(_selected_slot)         # 移动到空格
-		_squad_slots[cell] = sel_hero
-		_selected_slot = null
-	_refresh_board()
-
-
 # ── 刷新 ──────────────────────────────────────────────────────────────────────
 
 func refresh() -> void:
-	# 物品池按钮
-	for item_id in _pool_buttons:
-		var btn: Button = _pool_buttons[item_id]
-		var n: int = int(_pool.get(item_id, 0))
-		var sel: String = "▶ " if _selected_item == item_id else ""
-		btn.text = "%s%s ×%d" % [sel, Backpack.item_desc(item_id), n]
-		btn.disabled = n <= 0
-		btn.modulate = Color(0.7, 0.9, 1.0) if _selected_item == item_id else Color(1, 1, 1)
-
-	# 背包格子 + 属性
+	_rebuild_pool()
 	for i in range(_roster.size()):
-		var entry: Dictionary = _roster[i]
-		var grid: Dictionary = entry["grid"]
-		var cells: Dictionary = _cell_buttons[i]
+		var grid: Dictionary = _roster[i]["grid"]
+		var cells: Dictionary = _bag_slots[i]
 		for cell in cells:
-			var cb: Button = cells[cell]
+			var slot = cells[cell]
 			if grid.has(cell):
-				cb.text = Backpack.item_name(grid[cell])
-				cb.modulate = Color(0.75, 1.0, 0.75)
+				slot.set_display(Backpack.item_name(grid[cell]), Color(0.75, 1.0, 0.75))
 			else:
-				cb.text = "·"
-				cb.modulate = Color(1, 1, 1)
-		_stat_labels[i].text = _stat_text(entry)
+				slot.set_display("·", Color(1, 1, 1))
+		_stat_labels[i].text = _stat_text(_roster[i])
+	for cell in _squad_ui:
+		var h = _squad_slots.get(cell)
+		if h != null:
+			_squad_ui[cell].set_display(h.entity_name, Color(0.75, 1.0, 0.75))
+		else:
+			_squad_ui[cell].set_display("·", Color(1, 1, 1))
 
-	_refresh_board()
+
+func _rebuild_pool() -> void:
+	for c in _pool_box.get_children():
+		_pool_box.remove_child(c)
+		c.free()
+	var ids: Array = _pool.keys()
+	ids.sort()
+	for item_id in ids:
+		var n: int = int(_pool.get(item_id, 0))
+		if n <= 0:
+			continue
+		var slot := _new_slot("pool", item_id, Vector2(110, 44))
+		_pool_box.add_child(slot)
+		slot.set_display(Backpack.item_name(item_id), Color(0.85, 0.9, 1.0), "×%d" % n)
 
 
 func _stat_text(entry: Dictionary) -> String:
 	var grid: Dictionary = entry["grid"]
 	var base: Dictionary = entry["base"]
 	var b: Dictionary = Backpack.compute(grid)
-	var syn: String = ""
+	var syn := ""
 	if not b["synergies"].is_empty():
 		syn = "  [协同:%s]" % ", ".join(b["synergies"])
-	# 技能书 → 显示生效技能（职业不符标 ✗）
 	var ck: String = Loadout.class_key(entry["hero"].hero_class)
 	var skill_txt: Array = []
 	for book in b["books"]:
@@ -272,12 +207,11 @@ func _stat_text(entry: Dictionary) -> String:
 			skill_txt.append(nm)
 		else:
 			skill_txt.append(nm + "✗职业不符")
-	var skill_line: String = ""
+	var skill_line := ""
 	if not skill_txt.is_empty():
 		skill_line = "\n技: " + ", ".join(skill_txt)
-	# 暴击副属性
 	var ex: Dictionary = b["extra"]
-	var crit_txt: String = ""
+	var crit_txt := ""
 	if float(ex.get("crit_chance", 0.0)) > 0.0:
 		crit_txt = "  暴击%d%%" % int(float(ex["crit_chance"]) * 100)
 		if float(ex.get("crit_dmg", 0.0)) > 0.0:
@@ -288,14 +222,102 @@ func _stat_text(entry: Dictionary) -> String:
 		crit_txt, syn, skill_line]
 
 
-func _refresh_board() -> void:
-	for cell in _slot_buttons:
-		var btn: Button = _slot_buttons[cell]
-		var h = _squad_slots.get(cell)
-		var picked: bool = _selected_slot == cell
-		if h != null:
-			btn.text = ("▶ " if picked else "") + h.entity_name
-			btn.modulate = Color(0.7, 0.9, 1.0) if picked else Color(0.75, 1.0, 0.75)
+# ── 拖放回调（被 DragSlot 调用）────────────────────────────────────────────────
+
+## 从某槽位取出载荷（拖起时）。空槽返回 null。
+func grab_payload(kind: String, key) -> Variant:
+	match kind:
+		"bag":
+			var grid: Dictionary = _roster[key["hero_index"]]["grid"]
+			var c: Vector2i = key["cell"]
+			if not grid.has(c):
+				return null
+			return { "type": "item", "id": grid[c], "label": Backpack.item_name(grid[c]),
+					"src": { "kind": "bag", "hero_index": key["hero_index"], "cell": c } }
+		"pool":
+			if int(_pool.get(key, 0)) <= 0:
+				return null
+			return { "type": "item", "id": key, "label": Backpack.item_name(key),
+					"src": { "kind": "pool", "id": key } }
+		"squad":
+			var h = _squad_slots.get(key)
+			if h == null:
+				return null
+			return { "type": "hero", "hero": h, "label": h.entity_name, "src_cell": key }
+	return null
+
+
+## 目标槽位能否接收该载荷（物品→bag/pool；英雄→squad）。
+func can_accept(kind: String, _key, data: Dictionary) -> bool:
+	match data.get("type", ""):
+		"item":
+			return kind == "bag" or kind == "pool"
+		"hero":
+			return kind == "squad"
+	return false
+
+
+## 执行放下，然后延迟刷新（避免在拖放回调途中 free 当前槽位而报错）。
+func handle_drop(kind: String, key, data: Dictionary) -> void:
+	if data.get("type", "") == "item":
+		_drop_item(data, kind, key)
+	elif data.get("type", "") == "hero" and kind == "squad":
+		_drop_hero(data, key)
+	call_deferred("refresh")
+
+
+func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
+	var id: String = data["id"]
+	var src: Dictionary = data["src"]
+
+	if dest_kind == "pool":
+		if src["kind"] == "bag":      # 背包 → 库存
+			_roster[src["hero_index"]]["grid"].erase(src["cell"])
+			_owned_add(id, 1)
+		return                        # 库存 → 库存：无操作
+
+	# dest_kind == "bag"
+	var hi: int = dest_key["hero_index"]
+	var c: Vector2i = dest_key["cell"]
+	var dest_grid: Dictionary = _roster[hi]["grid"]
+	var existing: String = dest_grid.get(c, "")
+
+	if src["kind"] == "pool":         # 库存 → 背包格
+		if int(_pool.get(id, 0)) <= 0:
+			return
+		_owned_add(id, -1)
+		if existing != "":
+			_owned_add(existing, 1)   # 被挤掉的退回库存
+		dest_grid[c] = id
+	elif src["kind"] == "bag":        # 背包格 → 背包格（同/跨英雄）
+		var shi: int = src["hero_index"]
+		var sc: Vector2i = src["cell"]
+		if shi == hi and sc == c:
+			return
+		var src_grid: Dictionary = _roster[shi]["grid"]
+		dest_grid[c] = id
+		if existing != "":
+			src_grid[sc] = existing   # 交换
 		else:
-			btn.text = "·"
-			btn.modulate = Color(1, 1, 1)
+			src_grid.erase(sc)        # 移动
+
+
+func _drop_hero(data: Dictionary, dest_cell: Vector2i) -> void:
+	var src_cell: Vector2i = data["src_cell"]
+	if src_cell == dest_cell:
+		return
+	var moving = _squad_slots.get(src_cell)
+	var occupant = _squad_slots.get(dest_cell)
+	if occupant != null:
+		_squad_slots[src_cell] = occupant   # 交换
+	else:
+		_squad_slots.erase(src_cell)        # 移动到空格
+	_squad_slots[dest_cell] = moving
+
+
+func _owned_add(id: String, delta: int) -> void:
+	var n: int = int(_pool.get(id, 0)) + delta
+	if n <= 0:
+		_pool.erase(id)
+	else:
+		_pool[id] = n

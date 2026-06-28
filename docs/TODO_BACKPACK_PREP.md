@@ -43,8 +43,8 @@
 
 - **✅ Step 1（已完成）抽 builder**：`scripts/systems/BackpackLoadout.gd` 的 `build_party(loadouts, squad_slots, full_heal)`，实验改调它（`full_heal=true`），跑局将传 `false` 钳血。配 `test_backpack_loadout.gd`（含幂等、HP做法A）。
 - **✅ Step 2（已完成）状态进 RunManager**：名册 `roster=[{hero,base,grid}]` + `owned_items` 库存 + `squad_slots` 站位，`start_run` 初始化（空背包/空库存/默认站位），`party` 改为名册视图。裸 base 暂用占位高值（低值留到 Step 3）。扩 `test_run_manager`。
-- **Step 3 抽 `BackpackPrepPanel` + Encounter 用它**：把池/站位板/背包面板抽成共享 Control，操作注入的 RunManager 状态。实验场景改用它（保持测试绿守住不回归）。Encounter 开战前嵌入它 → 摆完 → 调 builder（`full_heal=false`）→ simulate → resolve。
-  - 开发期可临时给 `owned_items` 塞几件 debug 物品，好在战利品没做完前先测 prep。
+- **✅ Step 3（已完成）抽 `BackpackPrepPanel` + Encounter 用它**：共享编辑组件 `scripts/ui/BackpackPrepPanel.gd`（VBoxContainer，按引用操作 roster/owned_items/squad_slots）。实验场景 + Encounter 都改用它。Encounter 开战前嵌入 → 调 `build_party(full_heal=false)` 钳血 → simulate → resolve。配 `test_backpack_prep_panel`（放入/退回/校验）+ RunManager 端到端战斗路径测试。
+  - **DEBUG**：`RunManager._DEBUG_STARTER_ITEMS` 起手塞了一套物品好测试——**Step 4 战利品做好后删除、库存改回空 `{}`**。
 - **Step 4 战利品 draft**：ITEMS 加 `rarity` → 加权抽 3 件 → 胜利后弹 draft 界面（丢 1 留 2）→ 留下的进 `owned_items`。新增 RunManager `DRAFT` 状态。
 - **Step 5 首战平衡**：调第一个节点敌人到"裸队险胜"，跑几把验证开局不卡死。
 - **Step 6 休息/泉水回血点（与战利品同期，不能拖到后面）**：在节点地图插入非战斗的回血节点。

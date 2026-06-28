@@ -29,8 +29,8 @@
 - [x] **RunMap**：线性节点路径（3 战斗 + 1 魔王）+ 进度/队伍状态 + 胜利/失败横幅
 - [x] **Encounter**：敌人/队伍预览 → 开战(BattleSimulator 软站位) → 结果 → 回报
 - [x] **闭环跑通**：标题→地图→遭遇→回地图→魔王（通关/全灭）；HP 跨节点保留(消耗战)
-- [ ] **把背包构筑接成"遭遇前 prep 界面"**（当前遭遇是纯自动；下一步让玩家战前搭背包/摆站位）← 下一步（**方案已敲定，详见 `docs/TODO_BACKPACK_PREP.md`**：不回血消耗战 + 每场前编辑 + 战利品三选二 draft + 抽 BackpackPrepPanel）
-- [ ] **【与 prep 同档】战利品 draft + 休息/泉水回血点**：胜利后三选二掉落（rarity 权重）；节点加 `"rest"` 类型回血。**回血点是"不回血消耗战"的泄压阀、必需品**（详见 TODO_BACKPACK_PREP Step 4/6）。
+- [x] **把背包构筑接成"遭遇前 prep 界面"**（Step 1-3 完成）：`BackpackLoadout`(背包→Party 翻译，幂等+钳血) + RunManager 名册/库存/站位状态 + 共享 `BackpackPrepPanel`，已接进 Encounter——"开始冒险"开战前可搭背包/摆站位。（详见 `docs/TODO_BACKPACK_PREP.md`）
+- [ ] **【下一步｜与 prep 同档】战利品 draft + 休息/泉水回血点**：胜利后三选二掉落（rarity 权重）；节点加 `"rest"` 类型回血。**回血点是"不回血消耗战"的泄压阀、必需品**（TODO Step 4/6）。做战利品时删掉 `RunManager._DEBUG_STARTER_ITEMS` 临时种子。← 下一步
 - [ ] **【再下一档】商店（花金币）+ 事件节点 + 分支地图**：商店要等物品经济成型才有意义；分支地图（杀戮尖塔式）把战斗/精英/泉水/商店/事件串成有得选的路。旅程层保持轻（只做深背包一个系统）。
 - [ ] 局间 meta 解锁；存档（roguelike 跑局）
 - [ ] 平衡（起手队伍数值现为占位）

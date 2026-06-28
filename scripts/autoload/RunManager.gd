@@ -36,13 +36,26 @@ var owned_items: Dictionary = {}
 # squad_slots：站位摆放 Vector2i(col,row) -> Hero。row0=前排 / row1=后排（soft_row）。
 var squad_slots: Dictionary = {}
 
+# DEBUG（Step 3 临时）：起手就给一套物品，好在战利品(Step 4)做好前端到端测试 prep。
+# ⚠️ Step 4 战利品 draft 接好后删除本常量 + 把 start_run 的 seed 改回空 {}。
+const _DEBUG_STARTER_ITEMS: Dictionary = {
+	"iron_sword": 1, "longsword": 1, "whetstone": 1,
+	"shield": 1, "chainmail": 1, "leather": 1,
+	"staff": 1, "tome": 1, "holy_symbol": 1,
+	"amulet": 1, "charm": 1,
+	"book_slash": 1, "book_cleave": 1,
+	"book_fireball": 1, "book_icelance": 1,
+	"book_heal": 1, "book_purify": 1,
+	"crit_gem": 1, "keen_edge": 1, "berserk_ring": 1,
+}
+
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
 
 func start_run() -> void:
 	roster = _make_starter_roster()
 	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
-	owned_items = {}
+	owned_items = _DEBUG_STARTER_ITEMS.duplicate()  # DEBUG：见下方说明
 	squad_slots = _default_formation()
 	gold = 0
 	depth = 0

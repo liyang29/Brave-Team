@@ -6,21 +6,15 @@ extends Control
 # 验证核心假设：「搭一套背包（网格空间有限 + 邻接协同）→ 看它打一场 →
 #   '我搭出一套组合'那一下，爽不爽？」
 #
-# 3 人小队，每人一个 3×2 小背包；从共享物品池把物品摆进格子：
-#   - 物品给属性（攻/防/血/魔），战斗力全来自背包（不练级）
-#   - 相邻同类触发协同（剑+磨刀石=开刃、盾+甲=重装、法器+法器=共鸣、生命+生命=生机）
-#   - 把对的物品放对的人（法杖给法师、剑给战士）
-# 战斗复用现有 BattleSimulator 自动结算（Megaloot 模式：深度全在搭背包）。
+# 编辑界面（物品池/站位板/背包格子）抽到共享组件 BackpackPrepPanel，与跑局
+# 遭遇 prep 共用。本场景只保留：敌人 + 开战(满血) + 结果点评。
 #
-# 先不做：负重、骆驼公共背包、roguelike 地图、地形、金币、CD、装备/消耗双用。
 # 运行：以本场景为主场景启动，或编辑器 F6 运行 BackpackExperiment.tscn。
 # ─────────────────────────────────────────────────────────────────────────────
 
 const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
-
-const BAG_COLS := 3
-const BAG_ROWS := 2
+const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
 
 # 共享物品池（item_id -> 数量）
 const POOL_DEF: Dictionary = {
@@ -36,17 +30,11 @@ const POOL_DEF: Dictionary = {
 	"crit_gem": 1, "keen_edge": 1, "berserk_ring": 1,
 }
 
-var _heroes: Array = []        # [{ hero, base:{}, grid:{}, row, name, cls, cells:{cell:Button}, stat_label }]
+var _heroes: Array = []        # [{ hero, base:{}, grid:{}, name }]
 var _pool: Dictionary = {}     # item_id -> remaining
-var _selected_item: String = ""
-var _pool_buttons: Dictionary = {}  # item_id -> Button
-
-# 队伍站位板：Vector2i(col,row) -> hero。row 0=前排 / 1=后排。
-# 选项 A（轻）：只有"前排/后排"影响战斗（前排挨打、后排被保护），列只是摆放槽位、不计入战斗。
 var _squad_slots: Dictionary = {}
-var _slot_buttons: Dictionary = {}
-var _selected_slot = null
 
+var _prep                      # BackpackPrepPanel
 var _result_label: RichTextLabel
 var _log_label: RichTextLabel
 
@@ -56,15 +44,14 @@ func _ready() -> void:
 	_place_default_formation()
 	_pool = POOL_DEF.duplicate()
 	_build_ui()
-	_refresh()
 
 
 # 默认站位：战士前排，法师/牧师后排（玩家可自行调整）
 func _place_default_formation() -> void:
 	_squad_slots = {
-		Vector2i(0, 0): _heroes[0]["hero"],  # 战士 → 前排
-		Vector2i(0, 1): _heroes[1]["hero"],  # 法师 → 后排
-		Vector2i(1, 1): _heroes[2]["hero"],  # 牧师 → 后排
+		Vector2i(0, 0): _heroes[0]["hero"],
+		Vector2i(0, 1): _heroes[1]["hero"],
+		Vector2i(1, 1): _heroes[2]["hero"],
 	}
 
 
@@ -83,19 +70,16 @@ func _build_heroes() -> void:
 	_heroes.clear()
 	# 基础属性故意压低 —— 战斗力主要来自背包
 	var defs: Array = [
-		{ "cls": Hero.HeroClass.WARRIOR, "name": "战士", "row": "front",
+		{ "cls": Hero.HeroClass.WARRIOR, "name": "战士",
 		  "base": { "hp": 90, "atk": 6, "def": 8, "magic": 0, "spd": 9, "mp": 40 } },
-		{ "cls": Hero.HeroClass.MAGE, "name": "法师", "row": "back",
+		{ "cls": Hero.HeroClass.MAGE, "name": "法师",
 		  "base": { "hp": 55, "atk": 3, "def": 3, "magic": 5, "spd": 12, "mp": 70 } },
-		{ "cls": Hero.HeroClass.PRIEST, "name": "牧师", "row": "back",
+		{ "cls": Hero.HeroClass.PRIEST, "name": "牧师",
 		  "base": { "hp": 65, "atk": 3, "def": 4, "magic": 5, "spd": 9, "mp": 70 } },
 	]
 	for d in defs:
 		var hero: Hero = _make_hero(d["cls"], d["name"])
-		_heroes.append({
-			"hero": hero, "base": d["base"], "grid": {}, "row": d["row"],
-			"name": d["name"], "cls": d["cls"], "cells": {}, "stat_label": null,
-		})
+		_heroes.append({ "hero": hero, "base": d["base"], "grid": {}, "name": d["name"] })
 
 
 func _build_enemies() -> Array:
@@ -149,28 +133,10 @@ func _build_ui() -> void:
 		+ "把对的物品放对的人（法杖给法师、剑给战士），相邻摆放凑协同。[/color]"
 	root.add_child(intro)
 
-	# 物品池
-	root.add_child(_section("物品池（点选 → 再点背包格子放入；点已放入的格子可取回）"))
-	var pool_box: FlowContainer = FlowContainer.new()
-	pool_box.custom_minimum_size = Vector2(700, 0)
-	for item_id in POOL_DEF:
-		var btn: Button = Button.new()
-		btn.pressed.connect(_on_pool_pressed.bind(item_id))
-		_pool_buttons[item_id] = btn
-		pool_box.add_child(btn)
-	root.add_child(pool_box)
-
-	# 队伍站位板（点一个人 → 点另一格 移动/交换；前排挨打、后排被保护，列只是槽位）
-	root.add_child(_section("队伍站位（点一个人 → 点另一格 移动/交换 · 前排挨打、后排被保护）"))
-	root.add_child(_build_squad_board())
-
-	# 3 个英雄背包
-	root.add_child(_section("我方小队（每人 3×2 背包）"))
-	var heroes_row: HBoxContainer = HBoxContainer.new()
-	heroes_row.add_theme_constant_override("separation", 16)
-	for i in range(_heroes.size()):
-		heroes_row.add_child(_build_hero_panel(i))
-	root.add_child(heroes_row)
+	# 共享编辑组件
+	_prep = Prep.new()
+	root.add_child(_prep)
+	_prep.setup(_heroes, _pool, _squad_slots)
 
 	root.add_child(HSeparator.new())
 
@@ -183,7 +149,7 @@ func _build_ui() -> void:
 	btns.add_child(fight_btn)
 	var clear_btn: Button = Button.new()
 	clear_btn.text = "全部取回"
-	clear_btn.pressed.connect(_on_clear)
+	clear_btn.pressed.connect(func(): _prep.return_all_to_pool())
 	btns.add_child(clear_btn)
 	root.add_child(btns)
 
@@ -213,213 +179,18 @@ func _section(t: String) -> Label:
 	return l
 
 
-func _build_squad_board() -> Control:
-	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-
-	var grid: GridContainer = GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 6)
-	grid.add_theme_constant_override("v_separation", 6)
-	# row 0 = 前排（先放3格），row 1 = 后排
-	for row in range(2):
-		for col in range(3):
-			var cell := Vector2i(col, row)
-			var btn: Button = Button.new()
-			btn.custom_minimum_size = Vector2(120, 40)
-			btn.pressed.connect(_on_slot_pressed.bind(cell))
-			_slot_buttons[cell] = btn
-			grid.add_child(btn)
-	box.add_child(grid)
-
-	var legend: Label = Label.new()
-	legend.modulate = Color(0.6, 0.6, 0.6)
-	legend.text = "世界树式站位：后排受物理伤×0.7（更安全）、后排近战输出×0.5（远程/法术不受影响）；前排至少留1人，前排全灭后排自动顶上"
-	box.add_child(legend)
-	return box
-
-
-func _on_slot_pressed(cell: Vector2i) -> void:
-	var occupant = _squad_slots.get(cell)
-	if _selected_slot == null:
-		# 拿起：只有占用的格子能选
-		if occupant != null:
-			_selected_slot = cell
-	elif _selected_slot == cell:
-		_selected_slot = null   # 再点一次取消
-	else:
-		# 移动 / 交换
-		var sel_hero = _squad_slots.get(_selected_slot)
-		if occupant != null:
-			_squad_slots[_selected_slot] = occupant   # 交换
-		else:
-			_squad_slots.erase(_selected_slot)          # 移动到空格
-		_squad_slots[cell] = sel_hero
-		_selected_slot = null
-	_refresh_board()
-
-
-func _refresh_board() -> void:
-	for cell in _slot_buttons:
-		var btn: Button = _slot_buttons[cell]
-		var h = _squad_slots.get(cell)
-		var picked: bool = _selected_slot == cell
-		if h != null:
-			btn.text = ("▶ " if picked else "") + h.entity_name
-			btn.modulate = Color(0.7, 0.9, 1.0) if picked else Color(0.75, 1.0, 0.75)
-		else:
-			btn.text = "·"
-			btn.modulate = Color(1, 1, 1)
-
-
-func _build_hero_panel(index: int) -> Control:
-	var entry: Dictionary = _heroes[index]
-	var box: VBoxContainer = VBoxContainer.new()
-	box.add_theme_constant_override("separation", 4)
-
-	var head: Label = Label.new()
-	head.text = entry["name"]   # 前/后排由上方站位板决定
-	head.add_theme_font_size_override("font_size", 16)
-	box.add_child(head)
-
-	var grid: GridContainer = GridContainer.new()
-	grid.columns = BAG_COLS
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
-	for row in range(BAG_ROWS):
-		for col in range(BAG_COLS):
-			var cell := Vector2i(col, row)
-			var btn: Button = Button.new()
-			btn.custom_minimum_size = Vector2(96, 44)
-			btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			btn.pressed.connect(_on_cell_pressed.bind(index, cell))
-			entry["cells"][cell] = btn
-			grid.add_child(btn)
-	box.add_child(grid)
-
-	var stat: Label = Label.new()
-	stat.custom_minimum_size = Vector2(200, 0)
-	stat.modulate = Color(0.8, 0.9, 0.8)
-	entry["stat_label"] = stat
-	box.add_child(stat)
-
-	return box
-
-
-# ── 交互 ──────────────────────────────────────────────────────────────────────
-
-func _on_pool_pressed(item_id: String) -> void:
-	if int(_pool.get(item_id, 0)) <= 0:
-		return
-	_selected_item = item_id
-	_refresh()
-
-
-func _on_cell_pressed(hero_index: int, cell: Vector2i) -> void:
-	var grid: Dictionary = _heroes[hero_index]["grid"]
-	if grid.has(cell):
-		# 取回到池
-		var returned: String = grid[cell]
-		grid.erase(cell)
-		_pool[returned] = int(_pool.get(returned, 0)) + 1
-	elif _selected_item != "":
-		if int(_pool.get(_selected_item, 0)) <= 0:
-			return
-		grid[cell] = _selected_item
-		_pool[_selected_item] = int(_pool[_selected_item]) - 1
-		if int(_pool[_selected_item]) <= 0:
-			_selected_item = ""
-	_refresh()
-
-
-func _on_clear() -> void:
-	for entry in _heroes:
-		entry["grid"].clear()
-	_pool = POOL_DEF.duplicate()
-	_selected_item = ""
-	_refresh()
-
-
-func _refresh() -> void:
-	# 物品池按钮
-	for item_id in _pool_buttons:
-		var btn: Button = _pool_buttons[item_id]
-		var n: int = int(_pool.get(item_id, 0))
-		var sel: String = "▶ " if _selected_item == item_id else ""
-		btn.text = "%s%s ×%d" % [sel, Backpack.item_desc(item_id), n]
-		btn.disabled = n <= 0
-		btn.modulate = Color(0.7, 0.9, 1.0) if _selected_item == item_id else Color(1, 1, 1)
-
-	# 背包格子 + 属性
-	for entry in _heroes:
-		var grid: Dictionary = entry["grid"]
-		for cell in entry["cells"]:
-			var cb: Button = entry["cells"][cell]
-			if grid.has(cell):
-				cb.text = Backpack.item_name(grid[cell])
-				cb.modulate = Color(0.75, 1.0, 0.75)
-			else:
-				cb.text = "·"
-				cb.modulate = Color(1, 1, 1)
-		var b: Dictionary = Backpack.compute(grid)
-		var base: Dictionary = entry["base"]
-		var syn: String = ""
-		if not b["synergies"].is_empty():
-			syn = "  [协同:%s]" % ", ".join(b["synergies"])
-		# 技能书 → 显示生效技能（职业不符标 ✗）
-		var ck: String = Loadout.class_key(entry["cls"])
-		var skill_txt: Array = []
-		for book in b["books"]:
-			var sid: String = book["id"]
-			var nm: String = SkillTable.get_display_name(sid)
-			if SkillTable.get_skill(sid).get("hero_class", "") == ck:
-				skill_txt.append(nm)
-			else:
-				skill_txt.append(nm + "✗职业不符")
-		var skill_line: String = ""
-		if not skill_txt.is_empty():
-			skill_line = "\n技: " + ", ".join(skill_txt)
-		# 暴击副属性
-		var ex: Dictionary = b["extra"]
-		var crit_txt: String = ""
-		if float(ex.get("crit_chance", 0.0)) > 0.0:
-			crit_txt = "  暴击%d%%" % int(float(ex["crit_chance"]) * 100)
-			if float(ex.get("crit_dmg", 0.0)) > 0.0:
-				crit_txt += "/暴伤+%d%%" % int(float(ex["crit_dmg"]) * 100)
-		entry["stat_label"].text = "攻%d 防%d 血%d 魔%d%s%s%s" % [
-			int(base["atk"]) + b["atk"], int(base["def"]) + b["def"],
-			int(base["hp"]) + b["hp"], int(base["magic"]) + b["magic"], crit_txt, syn, skill_line]
-
-	_refresh_board()
-
-
 # ── 开战 ──────────────────────────────────────────────────────────────────────
 
 func _on_fight() -> void:
-	var any_item := false
-	for entry in _heroes:
-		if not entry["grid"].is_empty():
-			any_item = true
-	if not any_item:
+	if not _prep.any_item_placed():
 		_result_label.text = "[color=red]先给队伍摆点装备再开战。[/color]"
 		return
-
-	# 世界树规则：前排至少留 1 人
-	var has_front := false
-	for cell in _squad_slots:
-		if _squad_slots[cell] != null and cell.y == 0:
-			has_front = true
-	if not has_front:
+	if not _prep.has_front_row():
 		_result_label.text = "[color=red]前排至少留 1 人（不能全员躲后排）。[/color]"
 		return
 
-	# 「背包 → 可战斗 Party」翻译统一走 BackpackLoadout（与跑局 Encounter 共用）
-	# 实验是单场，开战满血（full_heal=true）；跑局传 false 走钳血消耗战。
-	var loadouts: Array = []
-	for entry in _heroes:
-		loadouts.append({ "hero": entry["hero"], "base": entry["base"], "grid": entry["grid"] })
-	var party: Party = Loadout.build_party(loadouts, _squad_slots, true)
-
+	# 实验是单场，开战满血（full_heal=true）；跑局走钳血消耗战（false）。
+	var party: Party = Loadout.build_party(_heroes, _squad_slots, true)
 	var result: BattleResult = BattleSimulator.simulate(party, _build_enemies())
 	_render_result(result)
 

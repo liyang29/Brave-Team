@@ -1,24 +1,34 @@
 extends Control
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Encounter — 遭遇（最小骨架）
-# 读 RunManager 当前节点的敌人 + 队伍 → 开战(自动战斗, 软站位) → 结果 → 继续回报。
-# 注：HP 用 RunManager.party 现值（跨节点消耗）；这里暂无背包 prep（下一步接入）。
+# Encounter — 遭遇（已接入背包 prep）
+# 读 RunManager 当前节点的敌人 + 队伍名册 → 战前搭背包/摆站位(BackpackPrepPanel)
+# → 开战(钳血消耗战, full_heal=false) → 结果 → 继续回报 RunManager。
+# HP 跨节点保留（消耗战）；背包/库存/站位都来自 RunManager，跨节点持续。
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
+const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
 
+var _prep
+var _hp_box: VBoxContainer
 var _result_label: RichTextLabel
 var _log_label: RichTextLabel
 var _action_btn: Button
 
 
 func _ready() -> void:
+	var scroll := ScrollContainer.new()
+	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(scroll)
+
 	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.custom_minimum_size = Vector2(740, 0)
 	root.add_theme_constant_override("separation", 8)
-	root.offset_left = 40; root.offset_top = 24; root.offset_right = -40; root.offset_bottom = -24
-	add_child(root)
+	root.offset_left = 40; root.offset_top = 24
+	scroll.add_child(root)
 
 	var node: Dictionary = RunManager.current_node()
 	var title := Label.new()
@@ -36,19 +46,19 @@ func _ready() -> void:
 		el.modulate = Color(1.0, 0.7, 0.65)
 		root.add_child(el)
 
-	# 队伍预览
-	root.add_child(_section("我方（HP 跨关保留）"))
-	for h in RunManager.party:
-		var hl := Label.new()
-		var dead := "（阵亡）" if not h.is_alive() else ""
-		hl.text = "%s  HP %d/%d  攻%d 防%d 魔%d%s" % [
-			h.entity_name, h.current_hp, h.get_max_hp(),
-			h.get_attack(), h.get_defense(), h.get_magic(), dead]
-		hl.modulate = Color(0.6, 0.6, 0.6) if not h.is_alive() else Color(0.8, 0.9, 0.8)
-		root.add_child(hl)
+	# 我方 HP（跨关消耗，开战不回血）
+	root.add_child(_section("我方 HP（跨关保留 · 开战不回血，靠泉水/休息点恢复）"))
+	_hp_box = VBoxContainer.new()
+	root.add_child(_hp_box)
+	_refresh_hp()
 
-	var spacer := Control.new(); spacer.custom_minimum_size = Vector2(0, 12)
-	root.add_child(spacer)
+	# 背包 / 站位编辑（共享组件，操作 RunManager 状态）
+	root.add_child(_section("战前准备：搭背包 + 摆站位"))
+	_prep = Prep.new()
+	root.add_child(_prep)
+	_prep.setup(RunManager.roster, RunManager.owned_items, RunManager.squad_slots)
+
+	root.add_child(HSeparator.new())
 
 	_action_btn = Button.new()
 	_action_btn.text = "⚔  开战"
@@ -71,24 +81,34 @@ func _ready() -> void:
 	root.add_child(_log_label)
 
 
-func _on_fight() -> void:
-	var heroes: Array = RunManager.alive_party()
-	if heroes.is_empty():
-		return
-	var party: Party = Party.create(heroes, null, 0.4)
-	party.positioning_mode = "soft_row"
-	for h in heroes:
-		party.set_row(h, _default_row(h))
+func _refresh_hp() -> void:
+	for c in _hp_box.get_children():
+		_hp_box.remove_child(c)
+		c.free()
+	for h in RunManager.party:
+		var hl := Label.new()
+		var dead := "（阵亡）" if not h.is_alive() else ""
+		hl.text = "%s  HP %d/%d%s" % [h.entity_name, h.current_hp, h.get_max_hp(), dead]
+		hl.modulate = Color(0.55, 0.55, 0.55) if not h.is_alive() else Color(0.8, 0.9, 0.8)
+		_hp_box.add_child(hl)
 
+
+func _on_fight() -> void:
+	if not _prep.any_item_placed():
+		_result_label.text = "[color=red]先给队伍摆点装备再开战。[/color]"
+		return
+	if not _prep.has_front_row():
+		_result_label.text = "[color=red]前排至少留 1 人（不能全员躲后排）。[/color]"
+		return
+
+	# 只让存活的人参战；钳血消耗战（full_heal=false）
+	var alive_loadouts: Array = RunManager.roster.filter(func(e): return e["hero"].is_alive())
+	if alive_loadouts.is_empty():
+		return
+	var party: Party = Loadout.build_party(alive_loadouts, RunManager.squad_slots, false)
 	var enemies: Array = RunManager.current_node().get("enemies", [])
 	var result: BattleResult = BattleSimulator.simulate(party, enemies)
 	_render_result(result)
-
-
-func _default_row(hero) -> String:
-	if hero.hero_class == Hero.HeroClass.WARRIOR or hero.hero_class == Hero.HeroClass.ROGUE:
-		return "front"
-	return "back"
 
 
 func _render_result(result: BattleResult) -> void:
@@ -100,6 +120,7 @@ func _render_result(result: BattleResult) -> void:
 			survivors.append("%s(%d)" % [h.entity_name, h.current_hp])
 	var line := "\n存活：%s" % (", ".join(survivors) if not survivors.is_empty() else "无")
 	_result_label.text = "%s（%d 回合）%s" % [head, result.total_turns, line]
+	_refresh_hp()
 
 	# 简短日志（最后 16 行）
 	var lines: Array = []

@@ -2,6 +2,8 @@ extends GutTest
 
 # RunManager（autoload）跑局状态机的最小验证。
 
+const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+
 func test_start_run_sets_up_state() -> void:
 	RunManager.start_run()
 	assert_eq(RunManager.state, RunManager.State.MAP, "开局进入地图")
@@ -42,7 +44,8 @@ func test_start_run_inits_backpack_state() -> void:
 	for e in RunManager.roster:
 		assert_true(e.has("hero") and e.has("base") and e.has("grid"), "条目含 hero/base/grid")
 		assert_true(e["grid"].is_empty(), "起手空背包")
-	assert_true(RunManager.owned_items.is_empty(), "起手库存为空（靠战利品）")
+	# Step 3 临时：起手塞了 debug 物品好测试 prep（Step 4 战利品做好后改回空库存）
+	assert_false(RunManager.owned_items.is_empty(), "起手库存含 debug 物品（Step3 临时，Step4 改回空）")
 	assert_eq(RunManager.squad_slots.size(), 3, "默认站位摆了 3 人")
 
 func test_party_is_view_of_roster() -> void:
@@ -72,3 +75,13 @@ func test_backpack_state_persists_across_nodes() -> void:
 	assert_eq(RunManager.depth, 1, "前进到第 1 节点")
 	assert_eq(int(RunManager.owned_items.get("iron_sword", 0)), 2, "库存跨节点保留")
 	assert_eq(RunManager.roster[0]["grid"].get(Vector2i(0, 0)), "longsword", "背包摆放跨节点保留")
+
+func test_encounter_combat_path_runs() -> void:
+	# 端到端：Encounter 的战斗路径——存活名册 → build_party(钳血) → 打真实节点敌人
+	RunManager.start_run()
+	RunManager.roster[0]["grid"][Vector2i(0, 0)] = "iron_sword"   # 战士摆把剑
+	var alive: Array = RunManager.roster.filter(func(e): return e["hero"].is_alive())
+	var party: Party = Loadout.build_party(alive, RunManager.squad_slots, false)
+	var enemies: Array = RunManager.current_node().get("enemies", [])
+	var result = BattleSimulator.simulate(party, enemies)
+	assert_true(result is BattleResult, "遭遇战斗路径产出 BattleResult，不报错")

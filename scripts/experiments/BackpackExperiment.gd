@@ -17,6 +17,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 
 const BAG_COLS := 3
 const BAG_ROWS := 2
@@ -76,17 +77,6 @@ func _make_hero(cls: int, nm: String) -> Hero:
 		sk.clear()   # 技能改由背包技能书在开战时注入
 	hero.entity_name = nm
 	return hero
-
-
-# Hero.HeroClass → SkillTable.hero_class 字符串（技能书职业匹配用）
-func _class_key(cls: int) -> String:
-	match cls:
-		Hero.HeroClass.WARRIOR: return "warrior"
-		Hero.HeroClass.MAGE:    return "mage"
-		Hero.HeroClass.PRIEST:  return "priest"
-		Hero.HeroClass.ROGUE:   return "rogue"
-		Hero.HeroClass.ARCHER:  return "archer"
-	return ""
 
 
 func _build_heroes() -> void:
@@ -377,7 +367,7 @@ func _refresh() -> void:
 		if not b["synergies"].is_empty():
 			syn = "  [协同:%s]" % ", ".join(b["synergies"])
 		# 技能书 → 显示生效技能（职业不符标 ✗）
-		var ck: String = _class_key(entry["cls"])
+		var ck: String = Loadout.class_key(entry["cls"])
 		var skill_txt: Array = []
 		for book in b["books"]:
 			var sid: String = book["id"]
@@ -423,51 +413,12 @@ func _on_fight() -> void:
 		_result_label.text = "[color=red]前排至少留 1 人（不能全员躲后排）。[/color]"
 		return
 
-	var heroes: Array = []
-	var cd_map: Dictionary = {}      # hero -> { skill_id: cd_turns }
-	var extra_map: Dictionary = {}   # hero -> { crit_chance: , crit_dmg: , ... }
+	# 「背包 → 可战斗 Party」翻译统一走 BackpackLoadout（与跑局 Encounter 共用）
+	# 实验是单场，开战满血（full_heal=true）；跑局传 false 走钳血消耗战。
+	var loadouts: Array = []
 	for entry in _heroes:
-		var b: Dictionary = Backpack.compute(entry["grid"])
-		var base: Dictionary = entry["base"]
-		var hero = entry["hero"]
-		hero.set("base_max_hp", int(base["hp"]) + b["hp"])
-		hero.set("base_attack", int(base["atk"]) + b["atk"])
-		hero.set("base_defense", int(base["def"]) + b["def"])
-		hero.set("base_magic", int(base["magic"]) + b["magic"])
-		hero.set("base_speed", int(base["spd"]))
-		hero.set("base_mp", int(base["mp"]))
-		hero.stat_block.rebuild()
-		hero.current_hp = hero.get_max_hp()
-		# 技能来自背包技能书（按职业过滤）；冷却配置随技能书带入
-		var sk = hero.get("skills")
-		if sk != null:
-			sk.clear()
-		var cfg: Dictionary = {}
-		var ck: String = _class_key(hero.hero_class)
-		for book in b["books"]:
-			var sid: String = book["id"]
-			if SkillTable.get_skill(sid).get("hero_class", "") == ck:
-				if sk != null and not (sid in sk):
-					sk.append(sid)
-				if int(book["cd"]) > 0:
-					cfg[sid] = int(book["cd"])
-		cd_map[hero] = cfg
-		extra_map[hero] = b["extra"]
-		heroes.append(hero)
-
-	var party: Party = Party.create(heroes, null, 0.4)
-	party.positioning_mode = "soft_row"   # 世界树式软站位
-	# 站位来自玩家在站位板上的摆放（只认前/后排，列不计入战斗）
-	for cell in _squad_slots:
-		var ph = _squad_slots[cell]
-		if ph != null:
-			party.set_row(ph, "front" if cell.y == 0 else "back")
-	# 技能书冷却注入
-	for hero in cd_map:
-		party.set_skill_cd(hero, cd_map[hero])
-	# 副属性注入（暴击等）
-	for hero in extra_map:
-		party.set_extra_stats(hero, extra_map[hero])
+		loadouts.append({ "hero": entry["hero"], "base": entry["base"], "grid": entry["grid"] })
+	var party: Party = Loadout.build_party(loadouts, _squad_slots, true)
 
 	var result: BattleResult = BattleSimulator.simulate(party, _build_enemies())
 	_render_result(result)

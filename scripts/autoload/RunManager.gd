@@ -24,11 +24,26 @@ var depth: int = 0           # 当前所在节点索引（0 起）
 var nodes: Array = []        # [{ type, name, enemies:Array[EnemyData], gold:int }]
 var last_result = null       # 上一场 BattleResult（结果界面用）
 
+# ── 背包构筑状态（Step 2：跨整局保留，供将来 prep 界面 + BackpackLoadout 用）──
+# roster：队伍名册，每个元素 = { "hero": Hero, "base": Dictionary, "grid": Dictionary }
+#   base = 英雄"光身"裸属性 { hp,atk,def,magic,spd,mp }（builder 幂等的算起点）
+#   grid = { Vector2i(col,row): item_id } 该英雄背包摆放
+#   ⚠️ 这是背包相关状态的"真相源"；party 是其英雄列表视图（向后兼容旧代码）。
+var roster: Array = []
+# owned_items：拥有但未摆入任何背包的物品库存（item_id -> 数量）。
+#   起手为空——力量靠战利品积累（决定⑤）。Step 4 战利品 draft 往这里加。
+var owned_items: Dictionary = {}
+# squad_slots：站位摆放 Vector2i(col,row) -> Hero。row0=前排 / row1=后排（soft_row）。
+var squad_slots: Dictionary = {}
+
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
 
 func start_run() -> void:
-	party = _make_starter_party()
+	roster = _make_starter_roster()
+	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
+	owned_items = {}
+	squad_slots = _default_formation()
 	gold = 0
 	depth = 0
 	nodes = _build_map()
@@ -76,13 +91,31 @@ func _set_state(s: int) -> void:
 	state_changed.emit(s)
 
 
-# ── 起手队伍（占位：直接给一套数值；将来由背包构筑决定）──────────────────────
+# ── 起手名册（占位数值：现保持现状，低裸base 留到 Step 3 接背包时再调）─────────
+# 返回 Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]。
+# base 暂等于英雄当前占位数值（裸base 真相源）；grid 空（起手空背包，靠战利品）。
 
-func _make_starter_party() -> Array:
-	var w: Hero = _starter(Hero.HeroClass.WARRIOR, "战士", 130, 16, 12, 8, 0, 60, ["slash"])
-	var m: Hero = _starter(Hero.HeroClass.MAGE,    "法师", 70, 8, 4, 13, 19, 80, ["fireball"])
-	var p: Hero = _starter(Hero.HeroClass.PRIEST,  "牧师", 85, 6, 7, 9, 16, 80, ["holy_heal", "purify"])
-	return [w, m, p]
+func _make_starter_roster() -> Array:
+	return [
+		_starter_entry(Hero.HeroClass.WARRIOR, "战士", 130, 16, 12, 8, 0, 60, ["slash"]),
+		_starter_entry(Hero.HeroClass.MAGE,    "法师", 70, 8, 4, 13, 19, 80, ["fireball"]),
+		_starter_entry(Hero.HeroClass.PRIEST,  "牧师", 85, 6, 7, 9, 16, 80, ["holy_heal", "purify"]),
+	]
+
+# 造一个名册条目：英雄 + 裸base 字典 + 空背包
+func _starter_entry(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
+					magic: int, mp: int, skills: Array) -> Dictionary:
+	var hero: Hero = _starter(cls, nm, hp, atk, def_v, spd, magic, mp, skills)
+	var base: Dictionary = { "hp": hp, "atk": atk, "def": def_v, "magic": magic, "spd": spd, "mp": mp }
+	return { "hero": hero, "base": base, "grid": {} }
+
+# 默认站位：战士前排，法师/牧师后排（row0 前 / row1 后；soft_row）
+func _default_formation() -> Dictionary:
+	var slots: Dictionary = {}
+	if roster.size() >= 1: slots[Vector2i(0, 0)] = roster[0]["hero"]
+	if roster.size() >= 2: slots[Vector2i(0, 1)] = roster[1]["hero"]
+	if roster.size() >= 3: slots[Vector2i(1, 1)] = roster[2]["hero"]
+	return slots
 
 func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 			  magic: int, mp: int, skills: Array) -> Hero:

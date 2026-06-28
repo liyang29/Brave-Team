@@ -41,14 +41,19 @@
 
 ## 修订后的切法（按此顺序执行）
 
-- **Step 1 抽 builder**：新建 `scripts/systems/BackpackLoadout.gd`（preload、无 class_name，同 BackpackModel 路子），搬 `BackpackExperiment.gd:426-471` → `build_party(heroes_with_grids, squad_slots, full_heal: bool)`。实验改调它（传 `full_heal=true`），跑局传 `false`（钳血）。**配 GUT 测试**。唯一必须先做对的一步。
-- **Step 2 状态进 RunManager**：英雄保留低 base，加字段：`grids: Array[Dictionary]`（每人一个网格）、`owned_items: Dictionary`（库存，item_id→数量）、`squad_slots: Dictionary`。`start_run` 初始化：空 grids、空库存、默认站位。
+- **✅ Step 1（已完成）抽 builder**：`scripts/systems/BackpackLoadout.gd` 的 `build_party(loadouts, squad_slots, full_heal)`，实验改调它（`full_heal=true`），跑局将传 `false` 钳血。配 `test_backpack_loadout.gd`（含幂等、HP做法A）。
+- **✅ Step 2（已完成）状态进 RunManager**：名册 `roster=[{hero,base,grid}]` + `owned_items` 库存 + `squad_slots` 站位，`start_run` 初始化（空背包/空库存/默认站位），`party` 改为名册视图。裸 base 暂用占位高值（低值留到 Step 3）。扩 `test_run_manager`。
 - **Step 3 抽 `BackpackPrepPanel` + Encounter 用它**：把池/站位板/背包面板抽成共享 Control，操作注入的 RunManager 状态。实验场景改用它（保持测试绿守住不回归）。Encounter 开战前嵌入它 → 摆完 → 调 builder（`full_heal=false`）→ simulate → resolve。
   - 开发期可临时给 `owned_items` 塞几件 debug 物品，好在战利品没做完前先测 prep。
 - **Step 4 战利品 draft**：ITEMS 加 `rarity` → 加权抽 3 件 → 胜利后弹 draft 界面（丢 1 留 2）→ 留下的进 `owned_items`。新增 RunManager `DRAFT` 状态。
 - **Step 5 首战平衡**：调第一个节点敌人到"裸队险胜"，跑几把验证开局不卡死。
+- **Step 6 休息/泉水回血点（与战利品同期，不能拖到后面）**：在节点地图插入非战斗的回血节点。
+  - **为什么和战利品绑一起做**：我们定了 ① **不回血（纯消耗战）**，整局 HP 只降不升，3 战 + 魔王全程不回血会非常残酷、大概率没到魔王就团灭。**回血点是消耗战的泄压阀，是必需品**，没它"不回血"这条决定就站不住。
+  - 数据结构已支持：节点 `type` 现为 `"battle"`/`"boss"`，加 `"rest"` 即可；RunManager `enter_current_node` 按 type 分流（战斗→Encounter，休息→回血界面）。
+  - 回血方式待定（下次聊）：固定回 X% / 花金币回 / 限次。MVP 建议先**固定回一定比例**最简单。
+  - 保持轻：旅程层只做轻策略纹理，别做成第二个烧脑系统（METHODOLOGY「只做深一个系统」）。
 
-> 验证目标（火花）：玩家搭出的 build 在跑局里真的起作用 + "丢哪件/放谁"的 draft 抉择有意思。
+> 验证目标（火花）：玩家搭出的 build 在跑局里真的起作用 + "丢哪件/放谁"的 draft 抉择有意思 + 消耗战配回血点后整局张弛有度（不是必死）。
 
 ---
 

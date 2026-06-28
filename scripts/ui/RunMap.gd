@@ -6,6 +6,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
+const SCENE_SHOP := "res://scenes/run/Shop.tscn"
 const SCENE_TITLE := "res://scenes/ui/TitleScreen.tscn"
 
 func _ready() -> void:
@@ -76,7 +77,9 @@ func _ready() -> void:
 	enter.add_theme_font_size_override("font_size", 20)
 	enter.pressed.connect(func():
 		RunManager.enter_current_node()
-		get_tree().change_scene_to_file(SCENE_ENCOUNTER))
+		# 村庄 → 商店；其它 → 遭遇
+		var next := SCENE_SHOP if node.get("type") == "shop" else SCENE_ENCOUNTER
+		get_tree().change_scene_to_file(next))
 	root.add_child(enter)
 
 

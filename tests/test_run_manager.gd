@@ -3,9 +3,13 @@ extends GutTest
 # RunManager（autoload）跑局状态机的最小验证。
 
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-# 过一个节点：胜利 → 若进 DRAFT 则用 keep 完成 draft 前进（默认不留以免污染库存）
+# 过一个节点：村庄→直接离开；战斗→胜利(若进 DRAFT 则用 keep 完成 draft)前进。
 func _advance(keep: Array = []) -> void:
+	if RunManager.current_node().get("type") == "shop":
+		RunManager.leave_shop()
+		return
 	RunManager.resolve_encounter(true)
 	if RunManager.state == RunManager.State.DRAFT:
 		RunManager.finish_draft(keep)
@@ -15,10 +19,10 @@ func test_start_run_sets_up_state() -> void:
 	RunManager.start_run()
 	assert_eq(RunManager.state, RunManager.State.MAP, "开局进入地图")
 	assert_eq(RunManager.party.size(), 3, "起手 3 人小队")
-	assert_eq(RunManager.gold, 0, "起手金币 0")
+	assert_eq(RunManager.gold, RunManager.START_GOLD, "起手金币=START_GOLD(500)")
 	assert_eq(RunManager.depth, 0, "起手在第 0 节点")
 	assert_gt(RunManager.nodes.size(), 0, "地图有节点")
-	assert_eq(RunManager.current_node().get("type"), "battle", "第一个节点是战斗")
+	assert_eq(RunManager.current_node().get("type"), "shop", "第一个节点是村庄商店")
 
 
 func test_win_advances_then_victory() -> void:
@@ -85,6 +89,7 @@ func test_backpack_state_persists_across_nodes() -> void:
 func test_encounter_combat_path_runs() -> void:
 	# 端到端：Encounter 的战斗路径——存活名册 → build_party(钳血) → 打真实节点敌人
 	RunManager.start_run()
+	RunManager.leave_shop()   # 跳过村庄到第一场战斗
 	RunManager.roster[0]["grid"][Vector2i(0, 0)] = "iron_sword"   # 战士摆把剑
 	var alive: Array = RunManager.roster.filter(func(e): return e["hero"].is_alive())
 	var party: Party = Loadout.build_party(alive, RunManager.squad_slots, false)
@@ -97,18 +102,20 @@ func test_encounter_combat_path_runs() -> void:
 
 func test_normal_win_enters_draft() -> void:
 	RunManager.start_run()
-	RunManager.resolve_encounter(true)   # 第 0 节点是普通战斗
+	RunManager.leave_shop()              # 跳过村庄到第一场战斗（depth=1）
+	RunManager.resolve_encounter(true)
 	assert_eq(RunManager.state, RunManager.State.DRAFT, "普通胜利 → 进入 DRAFT")
 	assert_eq(RunManager.pending_draft.size(), 3, "抽出 3 件待选")
-	assert_eq(RunManager.depth, 0, "depth 在 draft 完成前不前进")
+	assert_eq(RunManager.depth, 1, "depth 在 draft 完成前不前进")
 
 func test_finish_draft_adds_kept_and_advances() -> void:
 	RunManager.start_run()
+	RunManager.leave_shop()
 	RunManager.resolve_encounter(true)
 	RunManager.finish_draft(["iron_sword", "shield"])
 	assert_eq(int(RunManager.owned_items.get("iron_sword", 0)), 1, "留下的物品进库存")
 	assert_eq(int(RunManager.owned_items.get("shield", 0)), 1, "留下的第二件进库存")
-	assert_eq(RunManager.depth, 1, "draft 完成后前进")
+	assert_eq(RunManager.depth, 2, "draft 完成后前进（村庄1→战斗后到2）")
 	assert_eq(RunManager.state, RunManager.State.MAP, "回到地图")
 	assert_true(RunManager.pending_draft.is_empty(), "pending_draft 清空")
 
@@ -120,3 +127,39 @@ func test_boss_win_skips_draft_to_victory() -> void:
 	RunManager.resolve_encounter(true)   # 击败魔王
 	assert_eq(RunManager.state, RunManager.State.VICTORY, "魔王胜 → 直接通关，不抽战利品")
 	assert_true(RunManager.pending_draft.is_empty(), "魔王不产生 draft")
+
+
+# ── 村庄商店 ──────────────────────────────────────────────────────────────────
+
+func test_enter_shop_generates_stock() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()      # 第 0 节点是村庄
+	assert_eq(RunManager.state, RunManager.State.SHOP, "进村庄 → SHOP 状态")
+	assert_eq(RunManager.shop_stock.size(), RunManager.SHOP_STOCK_SIZE, "上货 6 件")
+
+func test_buy_item_deducts_gold_and_stocks() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	var item: String = RunManager.shop_stock[0]
+	var cost: int = LootTable.price(item)
+	var g0: int = RunManager.gold
+	assert_true(RunManager.buy_item(item), "金币够 → 买成功")
+	assert_eq(RunManager.gold, g0 - cost, "扣对应金币")
+	assert_eq(int(RunManager.owned_items.get(item, 0)), 1, "买到的进库存")
+	assert_false(item in RunManager.shop_stock, "买后下架")
+
+func test_buy_fails_without_gold() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	RunManager.gold = 0
+	var item: String = RunManager.shop_stock[0]
+	assert_false(RunManager.buy_item(item), "没钱 → 买失败")
+	assert_eq(int(RunManager.owned_items.get(item, 0)), 0, "没扣没进库存")
+
+func test_leave_shop_advances_to_first_battle() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	RunManager.leave_shop()
+	assert_eq(RunManager.depth, 1, "离开村庄 → 前进到第 1 节点")
+	assert_eq(RunManager.state, RunManager.State.MAP, "回到地图")
+	assert_eq(RunManager.current_node().get("type"), "battle", "第 1 节点是战斗")

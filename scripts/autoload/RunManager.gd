@@ -17,7 +17,10 @@ signal depth_changed(new_depth)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
-enum State { NONE, MAP, ENCOUNTER, DRAFT, VICTORY, GAME_OVER }
+enum State { NONE, MAP, ENCOUNTER, DRAFT, SHOP, VICTORY, GAME_OVER }
+
+const START_GOLD := 500
+const SHOP_STOCK_SIZE := 6
 
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
@@ -40,6 +43,8 @@ var squad_slots: Dictionary = {}
 
 # pending_draft：上一场非 boss 胜利抽出的待选战利品（item_id 数组），Draft 界面读它。
 var pending_draft: Array = []
+# shop_stock：当前商店在售物品（item_id 数组，买一件移除一件），进商店时生成。
+var shop_stock: Array = []
 
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
@@ -47,10 +52,11 @@ var pending_draft: Array = []
 func start_run() -> void:
 	roster = _make_starter_roster()
 	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
-	owned_items = {}                                 # 空背包起手，靠战利品积累
+	owned_items = {}                                 # 空背包起手，靠商店/战利品积累
 	squad_slots = _default_formation()
 	pending_draft = []
-	gold = 0
+	shop_stock = []
+	gold = START_GOLD                                # 起步金币，开局村庄商店采购
 	depth = 0
 	nodes = _build_map()
 	last_result = null
@@ -67,9 +73,38 @@ func alive_party() -> Array:
 	return party.filter(func(h): return h.is_alive())
 
 
-## 进入当前节点的遭遇
+## 进入当前节点：村庄 → 商店；其它 → 遭遇。
 func enter_current_node() -> void:
-	_set_state(State.ENCOUNTER)
+	if current_node().get("type", "") == "shop":
+		shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 按 rarity 随机上货
+		_set_state(State.SHOP)
+	else:
+		_set_state(State.ENCOUNTER)
+
+
+## 商店购买：金币够且在售 → 扣钱、入库、下架。返回是否成功。
+func buy_item(item_id: String) -> bool:
+	if not (item_id in shop_stock):
+		return false
+	var cost: int = LootTable.price(item_id)
+	if gold < cost:
+		return false
+	gold -= cost
+	gold_changed.emit(gold)
+	shop_stock.erase(item_id)
+	owned_items[item_id] = int(owned_items.get(item_id, 0)) + 1
+	return true
+
+
+## 离开商店 → 前进到下一节点（商店不会是最后一个节点）。
+func leave_shop() -> void:
+	shop_stock = []
+	depth += 1
+	depth_changed.emit(depth)
+	if depth >= nodes.size():
+		_set_state(State.VICTORY)
+	else:
+		_set_state(State.MAP)
 
 
 ## 遭遇结束回报：
@@ -164,6 +199,7 @@ func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 
 func _build_map() -> Array:
 	return [
+		_node("shop", "村庄", [], 0),
 		_node("battle", "林间遭遇", [_e("野狼", 70, 12, 4, 9), _e("野狼", 70, 12, 4, 9)], 20),
 		_node("battle", "剧毒巢穴", [_e("毒虫", 55, 11, 3, 11, "back", true), _e("石卫", 120, 13, 9, 6)], 25),
 		_node("battle", "废墟伏击", [_e("强盗", 95, 15, 6, 10), _e("游侠", 70, 14, 5, 12, "back", true)], 30),

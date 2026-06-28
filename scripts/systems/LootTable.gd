@@ -18,6 +18,22 @@ const RARITY_WEIGHTS: Dictionary = {
 	"epic": 8,
 }
 
+# 商店售价（按 rarity）。
+const RARITY_PRICES: Dictionary = {
+	"common": 50,
+	"rare": 120,
+	"epic": 250,
+}
+
+
+## 物品稀有度（未知当 common）
+static func rarity_of(item_id: String) -> String:
+	return Backpack.ITEMS.get(item_id, {}).get("rarity", "common")
+
+## 物品售价（按 rarity）
+static func price(item_id: String) -> int:
+	return int(RARITY_PRICES.get(rarity_of(item_id), RARITY_PRICES["common"]))
+
 
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
 static func draw_draft(count: int) -> Array:

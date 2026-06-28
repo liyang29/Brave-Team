@@ -95,9 +95,7 @@ func _refresh_hp() -> void:
 
 
 func _on_fight() -> void:
-	if not _prep.any_item_placed():
-		_result_label.text = "[color=red]先给队伍摆点装备再开战。[/color]"
-		return
+	# 允许裸打（不强制摆装备）；仅保留"前排至少留 1 人"的世界树规则
 	if not _prep.has_front_row():
 		_result_label.text = "[color=red]前排至少留 1 人（不能全员躲后排）。[/color]"
 		return

@@ -29,6 +29,12 @@ func test_draw_capped_by_pool_size() -> void:
 	assert_eq(huge.size(), Backpack.ITEMS.size(), "要的比池大 → 最多给满整池且不重复")
 
 
+func test_price_by_rarity() -> void:
+	assert_eq(LootTable.price("iron_sword"), 50, "普通=50")
+	assert_eq(LootTable.price("longsword"), 120, "稀有=120")
+	assert_eq(LootTable.price("crit_gem"), 250, "史诗=250")
+
+
 func test_weighting_favors_common_over_epic() -> void:
 	# 统计大量单抽，普通应明显多于史诗（概率性，给足样本 + 宽松阈值）
 	var common := 0

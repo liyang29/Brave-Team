@@ -165,8 +165,10 @@ func refresh() -> void:
 			var slot = cells[cell]
 			if grid.has(cell):
 				slot.set_display(Backpack.item_name(grid[cell]), Color(0.75, 1.0, 0.75))
+				slot.tooltip_text = Backpack.item_tooltip(grid[cell])
 			else:
 				slot.set_display("·", Color(1, 1, 1))
+				slot.tooltip_text = ""
 		_stat_labels[i].text = _stat_text(_roster[i])
 	for cell in _squad_ui:
 		var h = _squad_slots.get(cell)
@@ -189,6 +191,7 @@ func _rebuild_pool() -> void:
 		var slot := _new_slot("pool", item_id, Vector2(110, 44))
 		_pool_box.add_child(slot)
 		slot.set_display(Backpack.item_name(item_id), Color(0.85, 0.9, 1.0), "×%d" % n)
+		slot.tooltip_text = Backpack.item_tooltip(item_id)
 
 
 func _stat_text(entry: Dictionary) -> String:

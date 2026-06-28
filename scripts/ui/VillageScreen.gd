@@ -155,9 +155,12 @@ func _refresh_shop() -> void:
 		desc.custom_minimum_size = Vector2(460, 0)
 		desc.text = "【%s】%s" % [RARITY_ZH.get(rarity, rarity), Backpack.item_desc(item_id)]
 		desc.modulate = RARITY_COLOR.get(rarity, Color.WHITE)
+		desc.mouse_filter = Control.MOUSE_FILTER_STOP
+		desc.tooltip_text = Backpack.item_tooltip(item_id)
 		row.add_child(desc)
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(150, 34)
+		btn.tooltip_text = Backpack.item_tooltip(item_id)
 		btn.text = "买 %d 金" % cost
 		btn.disabled = RunManager.gold < cost
 		btn.pressed.connect(func():

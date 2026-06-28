@@ -12,6 +12,19 @@ const TRIALS := 20
 
 # ── 协同计算单测（确定性，无 RNG）─────────────────────────────────────────────
 
+func test_item_tooltip_equipment() -> void:
+	var tip := Backpack.item_tooltip("shield")
+	assert_true(tip.contains("圆盾"), "含名字")
+	assert_true(tip.contains("防 +5"), "含属性")
+	assert_true(tip.contains("重装"), "含协同提示")
+
+func test_item_tooltip_skillbook() -> void:
+	var tip := Backpack.item_tooltip("book_heal")
+	assert_true(tip.contains("技能书"), "标明技能书")
+	assert_true(tip.contains("牧师"), "含认职业")
+	assert_true(tip.contains("治疗"), "含技能效果说明")
+
+
 func test_item_stats_sum() -> void:
 	var grid := { Vector2i(0,0): "iron_sword", Vector2i(2,0): "whetstone" }  # 不相邻
 	var b := Backpack.compute(grid)

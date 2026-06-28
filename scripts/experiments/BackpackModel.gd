@@ -123,3 +123,82 @@ static func item_desc(item_id: String) -> String:
 	if float(it.get("crit_chance", 0.0)) != 0.0: parts.append("暴击+%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    parts.append("暴伤+%d%%" % int(it["crit_dmg"] * 100))
 	return "%s(%s)" % [it.get("name", item_id), ", ".join(parts)]
+
+
+const _RARITY_ZH: Dictionary = { "common": "普通", "rare": "稀有", "epic": "史诗" }
+const _TAG_HINT: Dictionary = {
+	"blade": "刃 · 与磨刀石相邻 = 开刃(攻+6)",
+	"sharpen": "磨 · 与刀刃相邻 = 开刃(攻+6)",
+	"guard": "盾 · 与护甲相邻 = 重装(防+5血+12)",
+	"armor": "甲 · 与盾相邻 = 重装(防+5血+12)",
+	"arcane": "法器 · 两件相邻 = 共鸣(魔+6)",
+	"vital": "生命 · 两件相邻 = 生机(血+18)",
+}
+
+## 物品详细信息（鼠标悬浮 tooltip 用，多行）。
+static func item_tooltip(item_id: String) -> String:
+	var it: Dictionary = ITEMS.get(item_id, {})
+	if it.is_empty():
+		return item_id
+	var lines: Array = []
+	lines.append("%s 【%s】" % [it.get("name", item_id), _RARITY_ZH.get(it.get("rarity", "common"), "普通")])
+
+	if it.get("tag", "") == "skillbook":
+		var sid: String = it.get("skill_id", "")
+		lines.append("技能书 · 冷却 %d 回合（占格、和装备抢空间）" % int(it.get("cd", 0)))
+		lines.append("认职业：%s" % _class_zh(SkillTable.get_skill(sid).get("hero_class", "")))
+		lines.append("效果：" + _skill_effect_text(sid))
+		return "\n".join(lines)
+
+	# 装备：属性 + 协同提示
+	var stats: Array = []
+	if int(it.get("atk", 0)) != 0:   stats.append("攻 +%d" % it["atk"])
+	if int(it.get("def", 0)) != 0:   stats.append("防 +%d" % it["def"])
+	if int(it.get("hp", 0)) != 0:    stats.append("血 +%d" % it["hp"])
+	if int(it.get("magic", 0)) != 0: stats.append("魔 +%d" % it["magic"])
+	if float(it.get("crit_chance", 0.0)) != 0.0: stats.append("暴击 +%d%%" % int(it["crit_chance"] * 100))
+	if float(it.get("crit_dmg", 0.0)) != 0.0:    stats.append("暴伤 +%d%%" % int(it["crit_dmg"] * 100))
+	if not stats.is_empty():
+		lines.append("属性：" + "  ".join(stats))
+	var hint: String = _TAG_HINT.get(it.get("tag", ""), "")
+	if hint != "":
+		lines.append("协同：" + hint)
+	return "\n".join(lines)
+
+
+static func _class_zh(c: String) -> String:
+	match c:
+		"warrior": return "战士"
+		"mage":    return "法师"
+		"priest":  return "牧师"
+		"rogue":   return "盗贼"
+		"archer":  return "猎人"
+	return c if c != "" else "通用"
+
+# 把 SkillTable 的技能数据转成一句人话效果
+static func _skill_effect_text(sid: String) -> String:
+	var s: Dictionary = SkillTable.get_skill(sid)
+	if s.is_empty():
+		return sid
+	var t: String = s.get("type", "damage")
+	var mp: String = "（耗蓝 %d）" % int(s.get("mp_cost", 0)) if int(s.get("mp_cost", 0)) > 0 else ""
+	if t == "heal_ally":
+		return "治疗血量最少的友军，回血 = %.1f×魔力 %s" % [float(s.get("power", 1.0)), mp]
+	if t == "buff_self":
+		var b: Array = []
+		if int(s.get("buff_attack", 0)) != 0:  b.append("攻+%d" % s["buff_attack"])
+		if int(s.get("buff_defense", 0)) != 0: b.append("防+%d" % s["buff_defense"])
+		if int(s.get("buff_speed", 0)) != 0:   b.append("速+%d" % s["buff_speed"])
+		if int(s.get("buff_magic", 0)) != 0:   b.append("魔+%d" % s["buff_magic"])
+		var dur: String = "全程" if int(s.get("buff_turns", -1)) < 0 else "%d回合" % int(s.get("buff_turns", 0))
+		return "强化自身 %s（%s）%s" % [", ".join(b), dur, mp]
+	# damage 类
+	var attr: String = "魔法" if s.get("use_magic", false) else "物理"
+	var parts: Array = ["造成 %.1f×%s 伤害" % [float(s.get("power", 1.0)), attr]]
+	if s.get("aoe", false):        parts.append("群体")
+	if s.get("ignore_def", false): parts.append("无视防御")
+	elif s.get("half_def", false): parts.append("半防")
+	if int(s.get("stun_turns", 0)) > 0:  parts.append("眩晕%d回合" % int(s["stun_turns"]))
+	if int(s.get("slow_turns", 0)) > 0:  parts.append("减速%d回合" % int(s["slow_turns"]))
+	if float(s.get("dot_power", 0.0)) > 0.0: parts.append("中毒%d回合" % int(s.get("dot_turns", 0)))
+	return "，".join(parts) + " " + mp

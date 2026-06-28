@@ -121,12 +121,10 @@ func _render_result(result: BattleResult) -> void:
 	_result_label.text = "%s（%d 回合）%s" % [head, result.total_turns, line]
 	_refresh_hp()
 
-	# 简短日志（最后 16 行）
+	# 完整战斗日志（界面在 ScrollContainer 里，可滚动查看全部）
 	var lines: Array = []
 	for log in result.turn_logs:
 		lines.append(_fmt(log))
-	if lines.size() > 16:
-		lines = lines.slice(lines.size() - 16)
 	_log_label.text = "\n".join(lines)
 
 	# 切换为"继续"，回报 RunManager

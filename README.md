@@ -34,6 +34,7 @@
 | `docs/ROGUELIKE_DESIGN.md` | **源文档**：定位/核心循环/四支柱/路线图/关键决策 |
 | `docs/PROGRESS.md` | 任务完成情况（已做/预留/下一步）|
 | `docs/METHODOLOGY.md` | 思想方法（怎么判断好不好玩、怎么做决策）|
+| `docs/COMBAT_MANUAL.md` | **战斗手册**：出手顺序/选目标/选技能/伤害公式/站位/状态（自动战斗怎么运作）|
 | `docs/COMBAT_REVAMP_AUTOBATTLER.md` | 战斗模块细节 |
 | `docs/COMBAT_STATS_CATALOG.md` | 战斗属性菜单（已有/可加）|
 | `docs/PROJECT_STRUCTURE.md` | **项目结构逐文件细表**（路径/属性/职责，核对用）|

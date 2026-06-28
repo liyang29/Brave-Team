@@ -64,6 +64,15 @@ Godot 可执行路径在环境变量 `$env:GODOT_PATH`（PowerShell）。
 - 数据驱动，数值不硬编码进逻辑；继承 ≤ 3 层。
 - i18n：玩家可见中文走 SkillTable 等的 `name_zh`；按需再引入翻译表。
 
+## Git / 工作流
+
+- **本项目直接在 `main` 分支开发，不使用 worktree 隔离。** 改动直接提交到 `main`（用 `brave-team-git-commit` skill）。
+- 启动 Claude Code 时**从主仓目录 `D:\program\gameDev\Brave Team` 启动、不要开 worktree 隔离模式**。
+- ⚠️ 例外：worktree 是会话**启动时**决定的，CLAUDE.md/会话中途都改不了。若本次会话已被放进 `.claude/worktrees/...`：
+  - 优先**直接对主仓操作**（绝对路径读写 + `git -C "D:\program\gameDev\Brave Team"` 提交），避免“worktree 提交→再合并”这一步；
+  - 或照旧在 worktree 提交后 fast-forward 合并回 `main`。
+- 别为常规改动主动新建 worktree。
+
 ## 当前阶段 & 下一步
 
 白盒原型。**跑局骨架已跑通**（标题→节点地图→遭遇自动战斗→回地图→魔王/全灭，由 RunManager 驱动）。背包/技能书/站位/暴击核心已验证（实验场景 + 71/71 测试）。

@@ -32,6 +32,8 @@ const ITEMS: Dictionary = {
 	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "aura": { "scope": "team",     "atk": 4 } },
 	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "aura": { "scope": "adjacent", "spd": 3 } },
 	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "aura": { "scope": "same_row", "def": 4 } },
+	"vanguard_horn":{ "name": "先锋号角", "tag": "banner", "rarity": "rare", "aura": { "scope": "front_row", "atk": 5 } },
+	"ward_totem":  { "name": "守护图腾", "tag": "banner", "rarity": "rare", "aura": { "scope": "back_row",  "def": 3, "hp": 10 } },
 
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
 	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic" },
@@ -129,7 +131,7 @@ static func grid_auras(grid: Dictionary) -> Array:
 			out.append(it["aura"])
 	return out
 
-const _SCOPE_ZH: Dictionary = { "team": "全队", "adjacent": "相邻", "same_row": "同排" }
+const _SCOPE_ZH: Dictionary = { "team": "全队", "adjacent": "相邻", "same_row": "同排", "front_row": "前排", "back_row": "后排" }
 const _STAT_ZH: Dictionary = { "atk": "攻", "def": "防", "hp": "血", "magic": "魔", "spd": "速", "mp": "蓝" }
 
 ## 光环效果的中文短描述，如 "全队 攻+4"

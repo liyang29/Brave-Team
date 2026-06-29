@@ -186,3 +186,33 @@ func test_same_row_aura() -> void:
 	Loadout.build_party(loadouts, slots, true)
 	assert_eq(same.base_defense, 5 + 4, "同排队友 +4 防")
 	assert_eq(other.base_defense, 3, "异排不吃")
+
+func test_front_row_aura_absolute() -> void:
+	# 先锋号角(前排全体+5攻)：后排持有者也能 buff 全体前排（绝对前排，不看自己站哪）
+	var backer := _hero(Hero.HeroClass.PRIEST)     # (0,1) 后排持旗
+	var front_a := _hero(Hero.HeroClass.WARRIOR)   # (0,0) 前排
+	var front_b := _hero(Hero.HeroClass.ROGUE)     # (1,0) 前排
+	var loadouts := [
+		{ "hero": backer, "base": _base(65,3,4,5,9,70), "grid": { Vector2i(0,0): "vanguard_horn" } },
+		{ "hero": front_a, "base": _base(90,6,8,0,9,40), "grid": {} },
+		{ "hero": front_b, "base": _base(70,7,5,0,16,50), "grid": {} },
+	]
+	var slots := { Vector2i(0,1): backer, Vector2i(0,0): front_a, Vector2i(1,0): front_b }
+	Loadout.build_party(loadouts, slots, true)
+	assert_eq(front_a.base_attack, 6 + 5, "前排A +5 攻")
+	assert_eq(front_b.base_attack, 7 + 5, "前排B +5 攻")
+	assert_eq(backer.base_attack, 3, "后排持旗者自己不在前排，不吃")
+
+func test_back_row_aura_absolute() -> void:
+	# 守护图腾(后排全体+3防+10血)：前排持有者 buff 全体后排脆皮
+	var fronter := _hero(Hero.HeroClass.WARRIOR)   # (0,0) 前排持图腾
+	var back_a := _hero(Hero.HeroClass.MAGE)       # (0,1) 后排
+	var loadouts := [
+		{ "hero": fronter, "base": _base(90,6,8,0,9,40), "grid": { Vector2i(0,0): "ward_totem" } },
+		{ "hero": back_a, "base": _base(55,3,3,5,12,70), "grid": {} },
+	]
+	var slots := { Vector2i(0,0): fronter, Vector2i(0,1): back_a }
+	Loadout.build_party(loadouts, slots, true)
+	assert_eq(back_a.base_defense, 3 + 3, "后排 +3 防")
+	assert_eq(back_a.base_max_hp, 55 + 10, "后排 +10 血")
+	assert_eq(fronter.base_defense, 8, "前排持图腾者自己不在后排，不吃")

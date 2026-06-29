@@ -89,7 +89,7 @@
 |----|------|--------|
 | **来源 Source** | 谁产生 | 背包物品 / 职业被动 / 技能 |
 | **效果 Effect** | 产生啥 | +攻防血速魔暴击 / 治疗·护盾·回蓝 / 嘲讽 / 闪避(新) / 伤害转移(新) / 触发型(击杀回血·受击反伤) |
-| **范围 Scope** ⭐ | 给谁 | 自己 / 全队 / **相邻站位** / **同排** / 特定职业 / 单个友军(血最少) |
+| **范围 Scope** ⭐ | 给谁 | 自己 / 全队 / **相邻** / **同排(相对)** / **前排·后排(绝对)** / 特定职业 / 单个友军(血最少) |
 | **触发 Trigger** | 何时 | 常驻 / 战斗事件(回合начало·受击·击杀·友军死) / 条件(前排活着时·自身>50%) |
 
 **Scope 是"小队"新增的那根轴**——把现有"自己"换成"全队/相邻/同排"，立刻有协同。
@@ -109,6 +109,7 @@
 - **第二档·战斗行为型**（碰 BattleSimulator，靠后）：嘲讽(已部分有 `HAS_TAUNT`，做成物品可带) / **闪避**(新关键词，伤害结算前 roll 免伤) / 事件触发(`on_battle_event` 钩子已有)。
 
 ### 路线
-- ✅ **第一切片（已做）站位光环**：物品 `aura: {scope, 属性...}`；`BackpackModel.grid_auras` 提取，`BackpackLoadout.build_party` 阶段2按 scope(team/adjacent/same_row) 注入。已加 军旗(全队+攻)/疾风图腾(相邻+速)/铁壁旗(同排+防)；tooltip/商店显示光环；`PowerScore` 给光环算分。配 GUT(全队含自己/相邻只命中邻居/同排)。
+- ✅ **第一切片（已做）站位光环**：物品 `aura: {scope, 属性...}`；`BackpackModel.grid_auras` 提取，`BackpackLoadout.build_party` 阶段2按 scope 注入。scope 支持 **team / adjacent / same_row(相对同排) / front_row·back_row(绝对前后排)**。已加 军旗(全队+攻)/疾风图腾(相邻+速)/铁壁旗(同排+防)/先锋号角(前排+攻)/守护图腾(后排+防血)；tooltip/商店显示光环；`PowerScore` 给光环算分。配 GUT(全队含自己/相邻/同排/前排/后排)。
+  - **same_row vs front_row 区别**：same_row=跟持有者同排(相对)；front_row/back_row=指定前/后排(绝对，后排持有者也能 buff 全体前排)。
 - **Backlog（第二档战斗钩子）**：① 闪避关键词(几率免伤，做"闪避T") ② 嘲讽做成物品/光环可带 ③ 伤害转移/分摊 ④ 事件触发型队级效果。
 - **以后加光环料 = 给物品加 `aura` 字段一行**（scope 已支持 team/adjacent/same_row；要新 scope 在 `_aura_hits` 加分支）。

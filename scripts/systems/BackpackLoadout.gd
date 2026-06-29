@@ -134,9 +134,11 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 
 
 ## 光环命中判定：scope 下，提供者 i 的光环是否作用到受益者 j。
-##   team     = 全队（含自己）
-##   adjacent = 站位正交相邻（不含自己；双方都需有站位格）
-##   same_row = 同排（不含自己；双方都需有站位格）
+##   team      = 全队（含自己）
+##   adjacent  = 站位正交相邻（不含自己；双方都需有站位格）
+##   same_row  = 跟提供者同排（相对；不含自己；双方都需站位格）
+##   front_row = 指定前排(row0)全体（绝对；含自己若在前排；只需受益者有站位格）
+##   back_row  = 指定后排(row1)全体（绝对；含自己若在后排）
 static func _aura_hits(scope: String, i: int, j: int, pcell, rcell) -> bool:
 	match scope:
 		"team":
@@ -149,6 +151,10 @@ static func _aura_hits(scope: String, i: int, j: int, pcell, rcell) -> bool:
 			if i == j or pcell == null or rcell == null:
 				return false
 			return pcell.y == rcell.y
+		"front_row":
+			return rcell != null and rcell.y == 0
+		"back_row":
+			return rcell != null and rcell.y == 1
 	return false
 
 

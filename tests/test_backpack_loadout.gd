@@ -90,7 +90,7 @@ func test_rows_from_squad_slots() -> void:
 	assert_eq(party.get_row(m), "back", "法师在 row1 → 后排")
 
 
-# ── HP 做法 A：满血 / 钳血 / 装备不回血 ────────────────────────────────────────
+# ── HP 按百分比同步：满血 / 加血装按比例补 / 摘装按比例缩 ──────────────────────
 
 func test_full_heal_true_fills_hp() -> void:
 	var w := _hero(Hero.HeroClass.WARRIOR)
@@ -98,25 +98,44 @@ func test_full_heal_true_fills_hp() -> void:
 	Loadout.build_party([{ "hero": w, "base": _base(90,6,8,0,9,40), "grid": {} }], {}, true)
 	assert_eq(w.current_hp, w.get_max_hp(), "full_heal=true → 满血")
 
-func test_clamp_hp_item_does_not_heal() -> void:
-	# 做法 A：捡到 +HP 装备只拉长血条，当前血不变（想回血靠泉水/休息点）
+func test_full_hp_stays_full_when_adding_hp_item() -> void:
+	# 玩家诉求：满血时加血上限，应仍满血（不再出现"满血却不满"）
 	var w := _hero(Hero.HeroClass.WARRIOR)
 	var base := _base(90,6,8,0,9,40)
-	Loadout.build_party([{ "hero": w, "base": base, "grid": {} }], {}, true)
-	assert_eq(w.current_hp, 90, "起始满血 90")
-	w.current_hp = 40   # 模拟打了一场剩 40
-	# 塞入红宝石(+20 血上限)，钳血 build
-	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, false)
-	assert_eq(w.get_max_hp(), 110, "上限拉长到 90+20=110")
-	assert_eq(w.current_hp, 40, "做法A：当前血不变，装备不回血")
-
-func test_clamp_caps_current_when_max_drops() -> void:
-	var w := _hero(Hero.HeroClass.WARRIOR)
-	var base := _base(90,6,8,0,9,40)
-	# 先戴红宝石满血到 110
-	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, true)
-	assert_eq(w.current_hp, 110, "满血 110")
-	# 摘掉红宝石，钳血 build → 上限回落 90，current 钳到 90
 	Loadout.build_party([{ "hero": w, "base": base, "grid": {} }], {}, false)
-	assert_eq(w.get_max_hp(), 90, "摘掉血装上限回落 90")
-	assert_eq(w.current_hp, 90, "current 钳到新上限 90")
+	assert_eq(w.current_hp, 90, "起始满血 90")
+	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, false)
+	assert_eq(w.get_max_hp(), 110, "上限 90+20=110")
+	assert_eq(w.current_hp, 110, "满血加血上限仍满血")
+
+func test_partial_hp_scales_by_percent() -> void:
+	# 剩约 60% 时加上限，当前血按比例同步（不是不动、也不是补满）
+	var w := _hero(Hero.HeroClass.WARRIOR)
+	var base := _base(100,6,8,0,9,40)   # max 100 便于算比例
+	Loadout.build_party([{ "hero": w, "base": base, "grid": {} }], {}, false)
+	w.current_hp = 60   # 60%
+	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, false)
+	assert_eq(w.get_max_hp(), 120, "上限 100+20=120")
+	assert_eq(w.current_hp, 72, "60% × 120 = 72（按比例补 12，不是补满）")
+
+func test_removing_hp_item_scales_down() -> void:
+	var w := _hero(Hero.HeroClass.WARRIOR)
+	var base := _base(100,6,8,0,9,40)
+	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, false)
+	w.current_hp = 60   # 60% of 120 = ... set explicitly
+	Loadout.build_party([{ "hero": w, "base": base, "grid": {} }], {}, false)
+	assert_eq(w.get_max_hp(), 100, "摘掉血装上限回落 100")
+	assert_eq(w.current_hp, 50, "60/120=50% × 100 = 50（按比例缩，摘戴不白嫖）")
+
+func test_dead_hero_not_revived_by_rebuild() -> void:
+	var w := _hero(Hero.HeroClass.WARRIOR)
+	var base := _base(90,6,8,0,9,40)
+	Loadout.build_party([{ "hero": w, "base": base, "grid": {} }], {}, false)
+	w.current_hp = 0   # 阵亡
+	Loadout.build_party([{ "hero": w, "base": base, "grid": { Vector2i(0,0): "charm" } }], {}, false)
+	assert_eq(w.current_hp, 0, "阵亡不被重算复活")
+
+func test_backpack_mp_added_to_base() -> void:
+	var m := _hero(Hero.HeroClass.MAGE)
+	Loadout.build_party([{ "hero": m, "base": _base(55,3,3,5,12,70), "grid": { Vector2i(0,0): "mana_charm" } }], {}, true)
+	assert_eq(m.base_mp, 70 + 30, "法力护符 +30 蓝加到 base_mp")

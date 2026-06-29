@@ -93,6 +93,7 @@ const W_ATK   := 1.0
 const W_MAGIC := 1.0
 const W_DEF   := 1.6   # 防御每点 > 血每点
 const W_HP    := 0.4
+const W_MP    := 0.15  # 蓝量：间接价值（多放几个技能），权重低
 const W_CRIT_CHANCE := 0.3   # 每 1% 暴击率
 const W_CRIT_DMG    := 0.2   # 每 1% 暴伤
 const SKILLBOOK_POWER := 8.0 # 技能书基础分（先拍，后续可按技能效用细化）
@@ -108,6 +109,7 @@ static func item_power(item_id: String) -> float:
 	p += int(it.get("magic", 0)) * W_MAGIC
 	p += int(it.get("def", 0))   * W_DEF
 	p += int(it.get("hp", 0))    * W_HP
+	p += int(it.get("mp", 0))    * W_MP
 	p += float(it.get("crit_chance", 0.0)) * 100.0 * W_CRIT_CHANCE
 	p += float(it.get("crit_dmg", 0.0))    * 100.0 * W_CRIT_DMG
 	return p

@@ -42,20 +42,28 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 		var base: Dictionary = entry["base"]
 		var b: Dictionary = Backpack.compute(entry["grid"])
 
-		# 属性：永远从裸 base 重算（幂等），背包只加 攻/防/血/魔；速/蓝背包不改
+		# 属性：永远从裸 base 重算（幂等），背包加 攻/防/血/魔/蓝；速度背包不改
+		# 先记旧血量与百分比，再改上限（用于"上限变化按比例同步当前血"）
+		var old_max: int = hero.get_max_hp()
+		var old_cur: int = hero.current_hp
+		var hp_pct: float = (float(old_cur) / float(old_max)) if old_max > 0 else 1.0
 		hero.set("base_max_hp", int(base["hp"]) + int(b["hp"]))
 		hero.set("base_attack", int(base["atk"]) + int(b["atk"]))
 		hero.set("base_defense", int(base["def"]) + int(b["def"]))
 		hero.set("base_magic", int(base["magic"]) + int(b["magic"]))
 		hero.set("base_speed", int(base["spd"]))
-		hero.set("base_mp", int(base["mp"]))
+		hero.set("base_mp", int(base["mp"]) + int(b.get("mp", 0)))
 		hero.stat_block.rebuild()
 
-		# HP：做法 A —— 满血(实验) 或 钳到新上限(跑局，不治疗)
+		# HP：满血(实验) 或 保留血量百分比(跑局)。
+		# 按比例同步：满血加血上限仍满血；剩 60% 加上限只补到 60%；摘装备按比例缩 → 反复摘戴不白嫖。
+		var new_max: int = hero.get_max_hp()
 		if full_heal:
-			hero.current_hp = hero.get_max_hp()
+			hero.current_hp = new_max
+		elif old_cur <= 0:
+			hero.current_hp = 0   # 阵亡不复活
 		else:
-			hero.current_hp = min(hero.current_hp, hero.get_max_hp())
+			hero.current_hp = clampi(int(round(hp_pct * new_max)), 1, new_max)
 
 		# 技能来自背包技能书（按职业过滤），冷却随书带入
 		var sk = hero.get("skills")

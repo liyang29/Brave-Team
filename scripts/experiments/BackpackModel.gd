@@ -25,6 +25,7 @@ const ITEMS: Dictionary = {
 	"holy_symbol": { "name": "圣徽",   "magic": 5, "tag": "holy",   "rarity": "rare" },
 	"amulet":      { "name": "护符",   "hp": 12, "def": 2, "tag": "vital", "rarity": "common" },
 	"charm":       { "name": "红宝石", "hp": 20, "tag": "vital",    "rarity": "rare" },
+	"mana_charm":  { "name": "法力护符", "mp": 30, "magic": 2, "tag": "arcane", "rarity": "rare" },
 
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
 	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic" },
@@ -64,6 +65,7 @@ static func compute(grid: Dictionary) -> Dictionary:
 	var def_v: int = 0
 	var hp: int = 0
 	var magic: int = 0
+	var mp: int = 0
 	var fired: Array = []
 	var books: Array = []   # [{ "id": skill_id, "cd": cd_turns }]
 	var extra: Dictionary = {}   # 副属性累加（crit_chance 等）
@@ -78,6 +80,7 @@ static func compute(grid: Dictionary) -> Dictionary:
 		def_v += int(it.get("def", 0))
 		hp    += int(it.get("hp", 0))
 		magic += int(it.get("magic", 0))
+		mp    += int(it.get("mp", 0))
 		# 副属性（通用累加，加新属性无需改这里的逻辑）
 		for k in EXTRA_KEYS:
 			if it.has(k):
@@ -103,7 +106,7 @@ static func compute(grid: Dictionary) -> Dictionary:
 					magic += int(bonus.get("magic", 0))
 					fired.append(s["name"])
 
-	return { "atk": atk, "def": def_v, "hp": hp, "magic": magic, "synergies": fired, "books": books, "extra": extra }
+	return { "atk": atk, "def": def_v, "hp": hp, "magic": magic, "mp": mp, "synergies": fired, "books": books, "extra": extra }
 
 
 ## 物品显示名
@@ -120,6 +123,7 @@ static func item_desc(item_id: String) -> String:
 	if int(it.get("def", 0)) != 0:   parts.append("防+%d" % it["def"])
 	if int(it.get("hp", 0)) != 0:    parts.append("血+%d" % it["hp"])
 	if int(it.get("magic", 0)) != 0: parts.append("魔+%d" % it["magic"])
+	if int(it.get("mp", 0)) != 0:    parts.append("蓝+%d" % it["mp"])
 	if float(it.get("crit_chance", 0.0)) != 0.0: parts.append("暴击+%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    parts.append("暴伤+%d%%" % int(it["crit_dmg"] * 100))
 	return "%s(%s)" % [it.get("name", item_id), ", ".join(parts)]
@@ -156,6 +160,7 @@ static func item_tooltip(item_id: String) -> String:
 	if int(it.get("def", 0)) != 0:   stats.append("防 +%d" % it["def"])
 	if int(it.get("hp", 0)) != 0:    stats.append("血 +%d" % it["hp"])
 	if int(it.get("magic", 0)) != 0: stats.append("魔 +%d" % it["magic"])
+	if int(it.get("mp", 0)) != 0:    stats.append("蓝 +%d" % it["mp"])
 	if float(it.get("crit_chance", 0.0)) != 0.0: stats.append("暴击 +%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    stats.append("暴伤 +%d%%" % int(it["crit_dmg"] * 100))
 	if not stats.is_empty():

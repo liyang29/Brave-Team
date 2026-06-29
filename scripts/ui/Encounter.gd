@@ -11,6 +11,7 @@ const SCENE_MAP := "res://scenes/run/RunMap.tscn"
 const SCENE_DRAFT := "res://scenes/run/Draft.tscn"
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
+const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
 
 var _prep
 var _hp_box: VBoxContainer
@@ -86,10 +87,12 @@ func _refresh_hp() -> void:
 	for c in _hp_box.get_children():
 		_hp_box.remove_child(c)
 		c.free()
-	for h in RunManager.party:
-		var hl := Label.new()
+	for e in RunManager.roster:
+		var h = e["hero"]
+		var max_mp: int = int(e["base"].get("mp", 0)) + int(Backpack.compute(e["grid"]).get("mp", 0))
 		var dead := "（阵亡）" if not h.is_alive() else ""
-		hl.text = "%s  HP %d/%d%s" % [h.entity_name, h.current_hp, h.get_max_hp(), dead]
+		var hl := Label.new()
+		hl.text = "%s  HP %d/%d · 蓝 %d%s" % [h.entity_name, h.current_hp, h.get_max_hp(), max_mp, dead]
 		hl.modulate = Color(0.55, 0.55, 0.55) if not h.is_alive() else Color(0.8, 0.9, 0.8)
 		_hp_box.add_child(hl)
 

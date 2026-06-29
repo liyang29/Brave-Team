@@ -219,9 +219,10 @@ func _stat_text(entry: Dictionary) -> String:
 		crit_txt = "  暴击%d%%" % int(float(ex["crit_chance"]) * 100)
 		if float(ex.get("crit_dmg", 0.0)) > 0.0:
 			crit_txt += "/暴伤+%d%%" % int(float(ex["crit_dmg"]) * 100)
-	return "攻%d 防%d 血%d 魔%d%s%s%s" % [
+	return "攻%d 防%d 血%d 魔%d 蓝%d%s%s%s" % [
 		int(base["atk"]) + int(b["atk"]), int(base["def"]) + int(b["def"]),
 		int(base["hp"]) + int(b["hp"]), int(base["magic"]) + int(b["magic"]),
+		int(base.get("mp", 0)) + int(b.get("mp", 0)),
 		crit_txt, syn, skill_line]
 
 

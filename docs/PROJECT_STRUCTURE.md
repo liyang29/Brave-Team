@@ -1,7 +1,7 @@
 # 项目结构（核对用清单）
 
 > 路径 → 文件 → 属性（类型 / 所属层 / 职责）的权威清单。新增/移动文件后回来对一下，保持同步。
-> 概览版在 `README.md`；本文件是**逐文件细表**。最后核对：2026-06-28。
+> 概览版在 `README.md`；本文件是**逐文件细表**。最后核对：2026-06-29。
 
 ## 顶层目录
 
@@ -147,7 +147,8 @@
 - `scripts/systems/run/` — 复杂跑局逻辑
 
 ## 已知待整理（与本结构相关）
-- `entities/items/`（Resource 物品体系）与 `experiments/BackpackModel.gd`（dict 物品体系）**未打通**，未来需定夺统一方案。
+> 完整架构风险/技术债清单(R1–R8,带状态与落地顺序)见 **`docs/ARCHITECTURE_RISKS.md`**。下面是与本结构最相关的几条摘录。
+- `entities/items/`（Resource 物品体系）与 `experiments/BackpackModel.gd`（dict 物品体系）**未打通**，未来需定夺统一方案。（R1）
 - `HeroFactory.CLASS_STRATEGIES` 死数据待清理。
 - ~~无 MonsterFactory~~ → ✅ 已抽 `MonsterFactory` + `ENEMIES` 表，内联怪物已收编。
 - 后期内容扩展（更多怪/Boss/节点/地图）方案见 `docs/SCALING_ROADMAP.md`。

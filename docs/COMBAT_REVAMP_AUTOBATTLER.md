@@ -235,7 +235,7 @@ static func _get_reachable_opponents(unit, opponents) -> Array:
 ```
 
 在 `simulate()` 选目标前调用：`var reachable = _get_reachable_opponents(unit, opponents)`，把 `reachable` 传给 `choose_target` 和 AOE 循环。
-> 嘲讽（已有 `HAS_TAUNT` / `_find_taunt_target`）在 `reachable` 范围内优先生效，逻辑不冲突。
+> 嘲讽（`_find_taunt_target`）在 `reachable` 范围内优先生效，逻辑不冲突。现支持物品副属性 `taunt` 赋予 + 职业 `HAS_TAUNT`，且**仅前排生效**（详见 `COMBAT_MANUAL.md` §6b）。
 
 ### 5.2 新克制机制（落 SkillTable，不硬编码）
 

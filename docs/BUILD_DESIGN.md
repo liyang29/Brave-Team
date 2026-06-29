@@ -112,6 +112,6 @@
 - ✅ **第一切片（已做）站位光环**：物品 `aura: {scope, 属性...}`；`BackpackModel.grid_auras` 提取，`BackpackLoadout.build_party` 阶段2按 scope 注入。scope 支持 **team / adjacent / same_row(相对同排) / front_row·back_row(绝对前后排)**。已加 军旗(全队+攻)/疾风图腾(相邻+速)/铁壁旗(同排+防)/先锋号角(前排+攻)/守护图腾(后排+防血)；tooltip/商店显示光环；`PowerScore` 给光环算分。配 GUT(全队含自己/相邻/同排/前排/后排)。
   - **统一规则：光环都含持有者本人**（带旗的人自己也吃，若在范围内）。adjacent=自己+相邻格；same_row=自己所在排；front_row/back_row=指定前/后排(绝对)。
   - **same_row vs front_row 区别**：same_row=跟持有者同排(相对，holder 站前就加前排)；front_row/back_row=固定前/后排(绝对，后排持有者也能 buff 全体前排)。
-- ✅ **第二档·第一刀（已做）闪避T 套件**：① 闪避关键词 `dodge_chance`（副属性，命中前 roll、几率完全免伤；上限 `BattleSimulator.DODGE_CAP=0.6`；物理+魔法都可闪，DoT/反伤不受影响）② 嘲讽物品化 `taunt`（副属性，`BattleCombatant.has_taunt()` → `_find_taunt_target` 优先锁定，可放任意英雄背包）。物品：疾风斗篷/暗影披风(闪避)、挑衅护符(嘲讽+防)/诱敌面具(纯嘲讽)；`PowerScore` 给闪避(EHP 乘子)/嘲讽算分；接入普攻+单体技能+AOE 三处；配 GUT。涌现"前排嘲讽吸火力+闪避保后排"的闪避T。
+- ✅ **第二档·第一刀（已做）闪避T 套件**：① 闪避关键词 `dodge_chance`（副属性，命中前 roll、几率完全免伤；上限 `BattleSimulator.DODGE_CAP=0.6`；物理+魔法都可闪，DoT/反伤不受影响）② 嘲讽物品化 `taunt`（副属性，`BattleCombatant.has_taunt()` → `_find_taunt_target` 优先锁定，可放任意英雄背包；**仅前排生效**——"嘲讽=站出来挡"，后排嘲讽件失效，避免"后排既偷 ×0.7 物理减伤又吸火力"的无抉择站位）。物品：疾风斗篷/暗影披风(闪避)、挑衅护符(嘲讽+防)/诱敌面具(纯嘲讽)；`PowerScore` 给闪避(EHP 乘子)/嘲讽算分；接入普攻+单体技能+AOE 三处；配 GUT。涌现"前排嘲讽吸火力+闪避保后排"的闪避T。
 - **Backlog（第二档剩余战斗钩子）**：③ 伤害转移/分摊（一个英雄替相邻/后排友军挡刀）④ 事件触发型队级效果（友军死/击杀/受击触发，复用 `on_battle_event`）⑤ 副属性光环（让光环能搬暴击/闪避等副属性，而非只搬 6 个 base 属性）。
 - **以后加光环料 = 给物品加 `aura` 字段一行**（scope 已支持 team/adjacent/same_row；要新 scope 在 `_aura_hits` 加分支）。

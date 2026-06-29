@@ -206,7 +206,7 @@ static func item_tooltip(item_id: String) -> String:
 	if float(it.get("crit_chance", 0.0)) != 0.0: stats.append("暴击 +%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    stats.append("暴伤 +%d%%" % int(it["crit_dmg"] * 100))
 	if float(it.get("dodge_chance", 0.0)) != 0.0: stats.append("闪避 +%d%%" % int(it["dodge_chance"] * 100))
-	if int(it.get("taunt", 0)) != 0:             stats.append("嘲讽（优先被攻击）")
+	if int(it.get("taunt", 0)) != 0:             stats.append("嘲讽（站前排时优先被攻击）")
 	if not stats.is_empty():
 		lines.append("属性：" + "  ".join(stats))
 	var hint: String = _TAG_HINT.get(it.get("tag", ""), "")

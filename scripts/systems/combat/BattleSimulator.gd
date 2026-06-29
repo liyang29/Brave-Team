@@ -542,6 +542,11 @@ static func _create_enemy_combatants(enemy_data_list: Array) -> Array:
 
 static func _find_taunt_target(opponents: Array):
 	for bc in opponents:
+		# 嘲讽=「我站出来挡」→ 只有【前排】嘲讽才生效。
+		# 后排嘲讽件失效（否则后排既偷 ×0.7 物理减伤又吸火力 = 主题别扭 + 站位无抉择）。
+		# 「前排全灭→后排顶上」(_promote_if_front_empty) 会把幸存坦克转为 front，仍能继续嘲讽。
+		if bc.row != "front":
+			continue
 		# 嘲讽来源二选一：① 物品副属性 taunt（小队第二档，可放谁背包谁吸火力）
 		#                  ② 策略硬编码 HAS_TAUNT（旧机制，保留）
 		if bc.has_taunt():

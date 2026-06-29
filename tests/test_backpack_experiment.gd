@@ -150,6 +150,24 @@ func test_no_taunt_returns_null() -> void:
 	assert_null(BattleSimulator._find_taunt_target([a, b]), "无嘲讽 → null（旧行为不变）")
 
 
+func test_taunt_only_works_in_front_row() -> void:
+	# 嘲讽=「站出来挡」：后排嘲讽件失效，移到前排才重新生效
+	var taunter := BattleCombatant.new()
+	taunter.source_name = "坦克"
+	taunter.extra_stats = { "taunt": 1 }
+	var bystander := BattleCombatant.new()
+	bystander.source_name = "前排"
+	bystander.row = "front"
+
+	taunter.row = "back"
+	assert_null(BattleSimulator._find_taunt_target([taunter, bystander]),
+		"后排嘲讽失效 → null（交回 AI 正常选目标，后排不再既减伤又吸火力）")
+
+	taunter.row = "front"
+	assert_eq(BattleSimulator._find_taunt_target([taunter, bystander]), taunter,
+		"嘲讽位站前排 → 重新被优先锁定")
+
+
 # ── 世界树式软站位 ────────────────────────────────────────────────────────────
 
 func _row_bc(row: String) -> BattleCombatant:

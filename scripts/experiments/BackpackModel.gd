@@ -40,6 +40,15 @@ const ITEMS: Dictionary = {
 	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare" },
 	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic" },
 
+	# ── 闪避 / 嘲讽副属性（小队第二档·"闪避T"套件）────────────────────────────
+	# dodge_chance：被攻击时几率完全免伤（战斗里 clamp 到 DODGE_CAP）。
+	# taunt：>0 = 优先被敌人攻击（吸火力保后排）。两者均走 extra 通路，同暴击。
+	# 设计：纯闪避/纯嘲讽件无属性 → 占格机会成本明显；坦克件嘲讽+防。
+	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare" },
+	"shadow_mantle":{ "name": "暗影披风", "dodge_chance": 0.30, "tag": "evasion", "rarity": "epic" },
+	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare" },
+	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common" },
+
 	# ── 技能书（占格、不给属性；认职业；带回合冷却）──────────────────────────
 	# 技能书 = 把"技能"也做成背包物品：占格 → 和装备抢空间（带书=少带甲）。
 	# 职业由对应技能的 SkillTable.hero_class 决定（实验里按持有者职业过滤）。
@@ -63,7 +72,7 @@ const SYNERGIES: Array = [
 
 # 副属性 key 列表：以后加新副属性（吸血/法抗/破甲…）只需往这里加 key，
 # 物品声明该 key、战斗公式读 BattleCombatant.get_stat()，compute 自动累加。
-const EXTRA_KEYS: Array = ["crit_chance", "crit_dmg"]
+const EXTRA_KEYS: Array = ["crit_chance", "crit_dmg", "dodge_chance", "taunt"]
 
 ## 计算一个背包的总加成。
 ## grid: { Vector2i(col,row): item_id }
@@ -156,6 +165,8 @@ static func item_desc(item_id: String) -> String:
 	if int(it.get("mp", 0)) != 0:    parts.append("蓝+%d" % it["mp"])
 	if float(it.get("crit_chance", 0.0)) != 0.0: parts.append("暴击+%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    parts.append("暴伤+%d%%" % int(it["crit_dmg"] * 100))
+	if float(it.get("dodge_chance", 0.0)) != 0.0: parts.append("闪避+%d%%" % int(it["dodge_chance"] * 100))
+	if int(it.get("taunt", 0)) != 0:             parts.append("嘲讽")
 	if it.has("aura"):                           parts.append("光环:" + aura_text(it["aura"]))
 	return "%s(%s)" % [it.get("name", item_id), ", ".join(parts)]
 
@@ -194,6 +205,8 @@ static func item_tooltip(item_id: String) -> String:
 	if int(it.get("mp", 0)) != 0:    stats.append("蓝 +%d" % it["mp"])
 	if float(it.get("crit_chance", 0.0)) != 0.0: stats.append("暴击 +%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    stats.append("暴伤 +%d%%" % int(it["crit_dmg"] * 100))
+	if float(it.get("dodge_chance", 0.0)) != 0.0: stats.append("闪避 +%d%%" % int(it["dodge_chance"] * 100))
+	if int(it.get("taunt", 0)) != 0:             stats.append("嘲讽（优先被攻击）")
 	if not stats.is_empty():
 		lines.append("属性：" + "  ".join(stats))
 	var hint: String = _TAG_HINT.get(it.get("tag", ""), "")

@@ -149,6 +149,9 @@ static func simulate(party, enemy_data_list: Array) -> BattleResult:
 # 两处共用（skill_id 为空 / 未知技能回退），确保修正一致、不再漏算。
 static func _basic_attack(actor: BattleCombatant, target: BattleCombatant, pos_mode: String) -> Array:
 	var logs: Array = []
+	if _roll_dodge(target):
+		logs.append(_make_dodge_log(target))
+		return logs   # 完全免伤：不结算伤害、不触发装备/击杀
 	var crit_mult := _roll_crit(actor)
 	var row_mult := _row_damage_mult(actor, target, true, pos_mode)   # 普攻为物理，受站位修正
 	var dmg := target.take_damage(int(round(actor.attack * crit_mult * row_mult)))
@@ -258,6 +261,9 @@ static func _execute_action(
 		var crit_mult: float = _roll_crit(actor)
 		var raw_aoe: int = int(float(base_atk) * power * crit_mult)
 		for opp in aoe_targets:
+			if _roll_dodge(opp):
+				logs.append(_make_dodge_log(opp))
+				continue
 			var dmg:        int = _calc_damage(raw_aoe, opp, ignore_def, half_def)
 			dmg = int(round(dmg * _row_damage_mult(actor, opp, not use_magic, pos_mode)))   # 站位修正（仅物理）
 			var actual_dmg: int = opp.take_damage_raw(dmg)   # 护盾吸收后的实际伤害
@@ -272,6 +278,9 @@ static func _execute_action(
 				_process_equipment_triggers("on_kill", actor, opp, actual_dmg, logs)
 				_notify_battle_event("on_kill", actor, { "target": opp, "damage": actual_dmg })
 	else:
+		if _roll_dodge(target):
+			logs.append(_make_dodge_log(target))
+			return logs   # 完全免伤：不结算伤害/异常状态/触发
 		var crit_mult:  float = _roll_crit(actor)
 		var raw_atk:    int = int(float(base_atk) * power * crit_mult)
 		var row_mult:   float = _row_damage_mult(actor, target, not use_magic, pos_mode)   # 站位修正（仅物理）
@@ -317,6 +326,28 @@ static func _roll_crit(actor: BattleCombatant) -> float:
 	if chance > 0.0 and randf() < chance:
 		return CRIT_BASE_MULT + actor.get_stat("crit_dmg", 0.0)
 	return 1.0
+
+
+# ── 闪避判定（小队第二档：副属性 dodge_chance）────────────────────────────────
+# 被攻击者命中前 roll；闪避 = 本次完全免伤（不结算伤害/异常状态/装备触发/击杀）。
+# 物理+魔法直接攻击都可闪（"闪避T"该躲一切）；DoT/反伤不走攻击路径，不受影响。
+# 上限 DODGE_CAP 防"100% 无敌"。无 dodge_chance 副属性的单位恒不闪（旧行为不变）。
+const DODGE_CAP: float = 0.6
+
+## 单位的有效闪避率（已 clamp 到 [0, DODGE_CAP]）。纯函数，便于测试。
+static func _dodge_chance(target: BattleCombatant) -> float:
+	return clampf(target.get_stat("dodge_chance", 0.0), 0.0, DODGE_CAP)
+
+## 本次攻击是否被闪避。
+static func _roll_dodge(target: BattleCombatant) -> bool:
+	var c: float = _dodge_chance(target)
+	return c > 0.0 and randf() < c
+
+## 构造一条"闪避"日志（skill_id="dodge"，伤害 0，BattleUI 显示为闪避）。
+static func _make_dodge_log(target: BattleCombatant) -> TurnLog:
+	var log := TurnLog.attack(target.source_name, target.source_name, 0)
+	log.skill_id = "dodge"
+	return log
 
 
 # ── 软站位伤害修正（方案 B / 世界树式，仅 soft_row 模式 + 仅物理伤害）──────────
@@ -511,6 +542,10 @@ static func _create_enemy_combatants(enemy_data_list: Array) -> Array:
 
 static func _find_taunt_target(opponents: Array):
 	for bc in opponents:
+		# 嘲讽来源二选一：① 物品副属性 taunt（小队第二档，可放谁背包谁吸火力）
+		#                  ② 策略硬编码 HAS_TAUNT（旧机制，保留）
+		if bc.has_taunt():
+			return bc
 		if bc.combat_strategy != null and bc.combat_strategy.get("HAS_TAUNT") == true:
 			return bc
 	return null

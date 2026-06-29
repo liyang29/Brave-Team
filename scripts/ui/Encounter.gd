@@ -144,6 +144,8 @@ func _render_result(result: BattleResult) -> void:
 func _fmt(log) -> String:
 	if log.skill_id == "dot_tick":
 		return "[color=#9b6dff]☠ %s 毒伤 %d[/color]" % [log.target_name, log.damage]
+	if log.skill_id == "dodge":
+		return "[color=#7fd0ff]✦ %s 闪避[/color]" % log.target_name
 	var act := "普攻" if log.skill_id.is_empty() else SkillTable.get_display_name(log.skill_id)
 	var crit := " [color=gold]暴击![/color]" if log.is_crit else ""
 	var kill := "（击杀）" if log.is_kill else ""

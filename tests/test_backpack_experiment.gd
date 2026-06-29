@@ -89,6 +89,67 @@ func test_roll_crit_none_is_backward_compatible() -> void:
 	assert_eq(BattleSimulator._roll_crit(bc), 1.0, "无暴击属性 → 倍率 1.0（旧战斗不变）")
 
 
+# ── 小队第二档：闪避 / 嘲讽（"闪避T"套件）─────────────────────────────────────
+
+func test_dodge_taunt_extra_in_compute() -> void:
+	var grid := { Vector2i(0,0): "shadow_mantle", Vector2i(1,0): "provoke_charm" }
+	var b := Backpack.compute(grid)
+	assert_almost_eq(float(b["extra"].get("dodge_chance", 0.0)), 0.30, 0.001, "暗影披风给 30% 闪避")
+	assert_eq(int(b["extra"].get("taunt", 0)), 1, "挑衅护符给嘲讽")
+	assert_eq(b["def"], 4, "挑衅护符还给防 +4")
+
+
+func test_dodge_chance_clamped() -> void:
+	var bc := BattleCombatant.new()
+	bc.extra_stats = { "dodge_chance": 1.0 }
+	assert_almost_eq(BattleSimulator._dodge_chance(bc), BattleSimulator.DODGE_CAP, 0.001,
+		"闪避率 clamp 到上限 %.2f" % BattleSimulator.DODGE_CAP)
+	var none := BattleCombatant.new()
+	assert_eq(BattleSimulator._dodge_chance(none), 0.0, "无闪避属性 → 0（旧战斗不变）")
+
+
+func test_dodge_nullifies_damage() -> void:
+	# 随机性：固定随机种子，统计 200 次普攻；闪避必 0 伤、未闪必正常掉血
+	seed(20240629)
+	var atk := BattleCombatant.new()
+	atk.attack = 20
+	var tgt := BattleCombatant.new()
+	tgt.defense = 0
+	tgt.extra_stats = { "dodge_chance": 0.6 }
+	var dodges := 0
+	var hits := 0
+	for i in range(200):
+		tgt.current_hp = 100
+		tgt.max_hp = 100
+		var logs: Array = BattleSimulator._basic_attack(atk, tgt, "reach")
+		if logs[0].skill_id == "dodge":
+			dodges += 1
+			assert_eq(logs[0].damage, 0, "闪避日志伤害为 0")
+			assert_eq(tgt.current_hp, 100, "闪避时不掉血")
+		else:
+			hits += 1
+			assert_eq(tgt.current_hp, 80, "未闪避正常掉血 20")
+	assert_gt(dodges, 0, "0.6 闪避率应触发若干次闪避")
+	assert_gt(hits, 0, "也应有未闪避的命中")
+
+
+func test_taunt_item_redirects_targeting() -> void:
+	var taunter := BattleCombatant.new()
+	taunter.source_name = "坦克"
+	taunter.extra_stats = { "taunt": 1 }
+	var squishy := BattleCombatant.new()
+	squishy.source_name = "脆皮"
+	# 顺序故意把脆皮放前面，验证嘲讽优先级而非数组顺序
+	var picked = BattleSimulator._find_taunt_target([squishy, taunter])
+	assert_eq(picked, taunter, "带嘲讽副属性的单位被优先锁定（吸火力保后排）")
+
+
+func test_no_taunt_returns_null() -> void:
+	var a := BattleCombatant.new()
+	var b := BattleCombatant.new()
+	assert_null(BattleSimulator._find_taunt_target([a, b]), "无嘲讽 → null（旧行为不变）")
+
+
 # ── 世界树式软站位 ────────────────────────────────────────────────────────────
 
 func _row_bc(row: String) -> BattleCombatant:

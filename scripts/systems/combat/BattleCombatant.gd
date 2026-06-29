@@ -96,6 +96,11 @@ var extra_stats: Dictionary = {}
 func get_stat(key: String, default: float = 0.0) -> float:
 	return float(extra_stats.get(key, default))
 
+## 是否带嘲讽（副属性 taunt>0）→ 敌人优先攻击本单位（吸火力保后排）。
+## 与 CombatStrategy.HAS_TAUNT 并列，由 BattleSimulator._find_taunt_target 判定。
+func has_taunt() -> bool:
+	return get_stat("taunt", 0.0) > 0.0
+
 
 # ── 工厂方法 ──────────────────────────────────────────────────────────────────
 

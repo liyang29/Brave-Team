@@ -40,6 +40,12 @@
 - [ ] 局间 meta 解锁；存档（roguelike 跑局）
 - [ ] 平衡（起手队伍数值现为占位）
 
+## ⭐ 小队跨英雄协同（差异化护城河，详设见 `BUILD_DESIGN.md` §7）
+
+- [x] **第一档·开战属性光环**：物品 `aura:{scope,属性...}`，`build_party` 阶段2按 scope 注入（team/adjacent/same_row/front_row/back_row，含持有者本人）；军旗/疾风图腾/铁壁旗/先锋号角/守护图腾；tooltip/商店/`PowerScore` 接入；配 GUT。
+- [x] **第二档·第一刀 闪避T 套件**：① 闪避 `dodge_chance`（命中前 roll 完全免伤，上限 `DODGE_CAP=0.6`，物理+魔法都可闪）② 嘲讽物品化 `taunt`（`has_taunt()`→`_find_taunt_target` 优先锁定）。物品：疾风斗篷/暗影披风/挑衅护符/诱敌面具；接入普攻+单体技能+AOE；`PowerScore` 给闪避(EHP 乘子)/嘲讽算分；配 GUT。涌现"前排嘲讽吸火力+闪避保后排"。
+- [ ] **第二档剩余**：③ 伤害转移/分摊 ④ 事件触发型队级效果（友军死/击杀/受击，复用 `on_battle_event`）⑤ 副属性光环（光环搬暴击/闪避等副属性，非只搬 base 属性）。
+
 ## 迁移记录（2026-06）
 
 从 `Brave Guild` 迁入：战斗核心 + 实体数据层 + HeroFactory/EnemyAIFactory + Party + 背包实验 + GUT + 3 份设计文档。

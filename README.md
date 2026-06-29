@@ -38,6 +38,7 @@
 | `docs/COMBAT_REVAMP_AUTOBATTLER.md` | 战斗模块细节 |
 | `docs/COMBAT_STATS_CATALOG.md` | 战斗属性菜单（已有/可加）|
 | `docs/PROJECT_STRUCTURE.md` | **项目结构逐文件细表**（路径/属性/职责，核对用）|
+| `docs/IDEAS.md` | 创意想法池（未排期的点子 + 评价/风险）|
 | `docs/SCALING_ROADMAP.md` | 内容扩展路线 & 工具策略（怪/Boss/地图怎么高效加）|
 | `CLAUDE.md` | 代码库结构与开发约定 |
 

@@ -42,6 +42,75 @@ func _bad_grids() -> Array:
 	]
 
 
+# 组一支测试队（战/法/牧）并装上 build，返回 loadouts + 站位
+func _team(grids: Array) -> Dictionary:
+	var ids := ["warrior", "mage", "priest"]
+	var loadouts: Array = []
+	for i in range(ids.size()):
+		var e: Dictionary = RunManager.make_hero_entry(ids[i])
+		e["grid"] = grids[i].duplicate()
+		loadouts.append(e)
+	var slots := {
+		Vector2i(0, 0): loadouts[0]["hero"],
+		Vector2i(0, 1): loadouts[1]["hero"],
+		Vector2i(1, 1): loadouts[2]["hero"],
+	}
+	return { "loadouts": loadouts, "slots": slots }
+
+# 单关满血胜率：每次新队满血单独打这关 N 次（隔离每关难度，不含跨关消耗）
+func _node_winrate(grids: Array, enemies: Array) -> int:
+	var wins := 0
+	for t in range(TRIALS):
+		var tm: Dictionary = _team(grids)
+		var party: Party = Loadout.build_party(tm["loadouts"], tm["slots"], true)
+		if BattleSimulator.simulate(party, enemies).party_won:
+			wins += 1
+	return wins
+
+# ── 逐关体检表（用法 A：模拟当尺子，给每关标难易）────────────────────────────
+func test_per_node_health_report() -> void:
+	RunManager.start_run()
+	gut.p("===== 逐关体检（每关满血单独打 %d 次）=====" % TRIALS)
+	gut.p("关卡            好build   中庸build")
+	for node in RunManager.nodes:
+		var enemies: Array = node.get("enemies", [])
+		if enemies.is_empty():
+			continue
+		var g := _node_winrate(_good_grids(), enemies)
+		var o := _node_winrate(_ok_grids(), enemies)
+		gut.p("%-12s    %d/%d      %d/%d" % [node.get("name", "?"), g, TRIALS, o, TRIALS])
+	# 阵亡分布：整局中庸 build 在哪一关倒下（消耗战难度真正的落点）
+	gut.p("--- 中庸 build 整局阵亡分布（%d 局）---" % TRIALS)
+	var dist: Dictionary = {}
+	for t in range(TRIALS):
+		var where := _run_track(_ok_grids())
+		dist[where] = int(dist.get(where, 0)) + 1
+	for k in dist:
+		gut.p("  %-12s ×%d" % [k, dist[k]])
+	assert_true(true, "体检报告（看 gut.p 输出）")
+
+# 跑一整局，返回在哪一关失败（节点名），通关则返回"通关"
+func _run_track(grids: Array) -> String:
+	RunManager.start_run()
+	var tm: Dictionary = _team(grids)
+	RunManager.roster = tm["loadouts"]
+	RunManager.party = RunManager.roster.map(func(e): return e["hero"])
+	RunManager.squad_slots = tm["slots"]
+	for d in range(RunManager.nodes.size()):
+		var node: Dictionary = RunManager.nodes[d]
+		match node.get("type"):
+			"village":
+				pass
+			"rest":
+				RunManager.rest_heal()
+			_:
+				var alive: Array = RunManager.roster.filter(func(e): return e["hero"].is_alive())
+				var party: Party = Loadout.build_party(alive, RunManager.squad_slots, false)
+				if not BattleSimulator.simulate(party, node.get("enemies", [])).party_won:
+					return String(node.get("name", "?"))
+	return "通关"
+
+
 # 跑一整局，返回是否通关（魔王也打过）
 func _run_once(grids: Array) -> bool:
 	RunManager.start_run()

@@ -87,7 +87,8 @@
 #### `scripts/systems/run/`
 | 路径 | 属性 | 说明 |
 |------|------|------|
-| `run/` | **预留** | 更复杂的跑局逻辑（EncounterData / 分支地图 / 商店），现仅 `.gitkeep` |
+| `run/NodeTypes.gd` | **纯数据/函数**，`extends RefCounted`，无 class_name（preload） | 节点类型注册表（单一真相源）：`REGISTRY` = type → {scene, state, on_enter}。加节点类型只改这一处；RunManager 取 state/on_enter、RunMap 取 scene |
+| `run/`（其余） | **预留** | 更复杂的跑局逻辑（EncounterData / 分支地图生成器），待填 |
 
 ### `scripts/utils/`
 | 文件 | 属性 | 职责 |

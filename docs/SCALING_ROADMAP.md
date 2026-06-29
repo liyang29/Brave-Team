@@ -24,7 +24,7 @@
 |------|------|------|
 | **怪物（很多种）** | `MonsterFactory` + `ENEMIES` 表，加怪=加一行 | ✅ **已做**（`scripts/systems/factories/MonsterFactory.gd`） |
 | **Boss 玩法逻辑** | 策略模式：新 Boss = 新 `CombatStrategy` 子类 + 表里一行 ai_type，核心战斗不动 | 骨架已有（`CombatStrategy` + `EnemyAIFactory`），顺着加 |
-| **节点类型（柴火/休息/事件/精英…）** | "节点类型注册表"：type → 场景/处理器。现 `RunMap`/`RunManager` 的 `match type` 涨到十几种时升级为注册表 | rest/shop 已是节点类型，分支用 match（待升级注册表） |
+| **节点类型（柴火/休息/事件/精英…）** | "节点类型注册表"：type → {scene, state, on_enter}。加类型只改注册表一处 | ✅ **已做**（`scripts/systems/run/NodeTypes.gd`；RunManager/RunMap 不再各自 match type） |
 | **地图（森林等，十几格）** | **程序生成**，别手摆：写地图生成器吃"生物群系配置"（允许节点类型+权重+长度+分支规则）→ 产出节点图 | ⬜ 未做（现为手写线性 `_build_map`） |
 | **物品** | 大 const 表（已是） | ✅ `BackpackModel.ITEMS` + `LootTable` |
 | **职业/英雄** | `HeroFactory` 数据驱动（已是） | ✅ |

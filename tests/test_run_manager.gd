@@ -5,6 +5,7 @@ extends GutTest
 
 const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
+const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 
 # 过一个节点：村庄→离开；泉水→回血并离开；战斗→胜利(若进 DRAFT 用 keep 完成)前进。
 func _advance(keep: Array = []) -> void:
@@ -220,6 +221,28 @@ func test_recruit_blocked_without_gold() -> void:
 func test_hero_pool_has_rogue_and_archer() -> void:
 	assert_true(RunManager.HERO_TEMPLATES.has("rogue"), "英雄池含盗贼")
 	assert_true(RunManager.HERO_TEMPLATES.has("archer"), "英雄池含猎人")
+
+
+# ── 节点类型注册表（R3：单一真相源守卫）──────────────────────────────────────
+
+func test_every_map_node_type_is_registered() -> void:
+	# 地图里出现的每种节点类型都必须在 NodeTypes 注册 —— 加类型漏注册时这条会红。
+	RunManager.start_run()
+	for n in RunManager.nodes:
+		var t: String = n.get("type", "")
+		assert_true(NodeTypes.REGISTRY.has(t), "节点类型 '%s' 已在 NodeTypes 注册" % t)
+
+func test_registry_state_names_are_valid_states() -> void:
+	# 注册表里的 state 名必须是合法的 RunManager.State 枚举名（State[name] 才不会炸）。
+	for t in NodeTypes.REGISTRY:
+		var sname: String = NodeTypes.REGISTRY[t].get("state", "")
+		assert_true(RunManager.State.has(sname), "状态名 '%s' 是合法 State" % sname)
+
+func test_enter_rest_via_registry() -> void:
+	# 回归：rest 节点经注册表进入 REST（不再靠 enter_current_node 里的 match）。
+	_goto_type("rest")
+	RunManager.enter_current_node()
+	assert_eq(RunManager.state, RunManager.State.REST, "rest 节点 → REST 状态（注册表驱动）")
 
 
 # ── 泉水 / 休息点 ─────────────────────────────────────────────────────────────

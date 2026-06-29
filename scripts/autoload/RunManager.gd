@@ -16,6 +16,7 @@ signal gold_changed(new_gold)
 signal depth_changed(new_depth)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
+const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 
 enum State { NONE, MAP, ENCOUNTER, DRAFT, VILLAGE, REST, VICTORY, GAME_OVER }
 
@@ -93,17 +94,19 @@ func alive_party() -> Array:
 	return party.filter(func(h): return h.is_alive())
 
 
-## 进入当前节点：村庄 → 商店；泉水 → 休息；其它 → 遭遇。
+## 进入当前节点：由 NodeTypes 注册表决定进哪个状态 + 是否要进入前准备。
+## 加节点类型只改 NodeTypes.REGISTRY 一处（不再在这里逐类型 match）。
 func enter_current_node() -> void:
-	match current_node().get("type", ""):
-		"village":
-			shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)   # 商店：按 rarity 随机上货
-			tavern_offers = _roll_recruits(TAVERN_OFFERS)        # 招募：随机候选
-			_set_state(State.VILLAGE)
-		"rest":
-			_set_state(State.REST)
-		_:
-			_set_state(State.ENCOUNTER)
+	var def: Dictionary = NodeTypes.get_def(current_node().get("type", ""))
+	var hook: String = def.get("on_enter", "")
+	if hook != "" and has_method(hook):
+		call(hook)                                       # 进入前准备（如村庄上货/招募）
+	_set_state(State[def.get("state", "ENCOUNTER")])     # 枚举名字符串 → State 枚举
+
+## 村庄进入前准备：商店按 rarity 上货 + 随机招募候选（由 NodeTypes 的 on_enter 调）。
+func _enter_village() -> void:
+	shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)
+	tavern_offers = _roll_recruits(TAVERN_OFFERS)
 
 
 ## 泉水/休息：全员存活英雄回复 REST_HEAL_PCT 比例的最大血（钳到上限）。
@@ -120,14 +123,21 @@ func rest_heal() -> Array:
 	return report
 
 
-## 离开休息点 → 前进到下一节点。
-func leave_rest() -> void:
+## 前进到下一节点：到尽头则通关，否则回地图。
+## 调用方先各自清理自己的临时状态（商店/招募/draft），再调本方法统一前进——
+## 避免 "depth+=1 → 越界检查 → set MAP/VICTORY" 这段在多个 leave_*/finish 里重复出错。
+func _advance() -> void:
 	depth += 1
 	depth_changed.emit(depth)
 	if depth >= nodes.size():
 		_set_state(State.VICTORY)
 	else:
 		_set_state(State.MAP)
+
+
+## 离开休息点 → 前进到下一节点。
+func leave_rest() -> void:
+	_advance()
 
 
 ## 商店购买：金币够且在售 → 扣钱、入库、下架。返回是否成功。
@@ -171,12 +181,7 @@ func recruit(template_id: String) -> bool:
 func leave_village() -> void:
 	shop_stock = []
 	tavern_offers = []
-	depth += 1
-	depth_changed.emit(depth)
-	if depth >= nodes.size():
-		_set_state(State.VICTORY)
-	else:
-		_set_state(State.MAP)
+	_advance()
 
 # 抽 n 个英雄池模板作候选（同一次不重复，避免同店出现两个同样的人）。
 func _roll_recruits(n: int) -> Array:
@@ -218,12 +223,7 @@ func finish_draft(kept: Array) -> void:
 	for id in kept:
 		owned_items[id] = int(owned_items.get(id, 0)) + 1
 	pending_draft = []
-	depth += 1
-	depth_changed.emit(depth)
-	if depth >= nodes.size():
-		_set_state(State.VICTORY)
-	else:
-		_set_state(State.MAP)
+	_advance()
 
 
 func add_gold(n: int) -> void:

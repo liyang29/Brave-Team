@@ -5,9 +5,7 @@ extends Control
 # 读 RunManager：MAP→显示节点路径+进入按钮；VICTORY/GAME_OVER→横幅+返回标题。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
-const SCENE_VILLAGE := "res://scenes/run/Village.tscn"
-const SCENE_REST := "res://scenes/run/Rest.tscn"
+const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 const SCENE_TITLE := "res://scenes/ui/TitleScreen.tscn"
 
 func _ready() -> void:
@@ -78,12 +76,8 @@ func _ready() -> void:
 	enter.add_theme_font_size_override("font_size", 20)
 	enter.pressed.connect(func():
 		RunManager.enter_current_node()
-		# 按节点类型进对应场景
-		var next := SCENE_ENCOUNTER
-		match node.get("type"):
-			"village": next = SCENE_VILLAGE
-			"rest": next = SCENE_REST
-		get_tree().change_scene_to_file(next))
+		# 按节点类型进对应场景（单一真相源：NodeTypes 注册表）
+		get_tree().change_scene_to_file(NodeTypes.scene_for(node.get("type", ""))))
 	root.add_child(enter)
 
 

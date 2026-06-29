@@ -7,7 +7,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 const RARITY_ZH := { "common": "普通", "rare": "稀有", "epic": "史诗" }
 const RARITY_COLOR := {

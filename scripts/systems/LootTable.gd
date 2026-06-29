@@ -9,7 +9,7 @@ extends RefCounted
 # 故意不带 class_name（preload 引入），同 BackpackModel/BackpackLoadout 路子。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 # 各稀有度的抽取权重（越大越常见）。普通 65 / 稀有 27 / 史诗 8。
 const RARITY_WEIGHTS: Dictionary = {

@@ -17,11 +17,12 @@
 
 ## 🔴 严重(扩张前优先)
 
-### R1. 两套物品系统并存、未打通　⬜
-- **问题**:`entities/items/`(Item/Equipment/Consumable 的 Resource 体系)是**死代码**;真正在跑的是 `experiments/BackpackModel.gd` 的 `ITEMS` 字典。物品是核心深度来源,真相源却住在 `experiments/`(脏实验)文件夹、顶着 `BackpackModel` 的名。
-- **风险**:掉落/商店/套装/合成长出来后,命名与位置的"谎"会反复绊人。
-- **建议**:正式认 dict 体系 → 搬出 experiments/(如 `systems/items/ItemTable.gd`)→ 退役 Resource 物品体系。
-- **证据**:`PROJECT_STRUCTURE.md` 第 57/149 行自己已标。
+### R1. 两套物品系统并存、未打通　🔧 部分缓解(2026-06-29)
+- **问题**:`entities/items/`(Item/Equipment/Consumable 的 Resource 体系)是**死代码**;真正在跑的是 `systems/backpack/BackpackModel.gd` 的 `ITEMS` 字典。两套并存、未打通。
+- **已做**:把 `BackpackModel`/`BackpackLoadout` 从 `experiments/` 迁到 `systems/backpack/`(核心不再住"脏实验"文件夹,位置/语义已正)。
+- **仍待办**:正式退役 `entities/items/` 的 Resource 物品体系(或定夺统一方案),消除"两套物品"。
+- **风险**:掉落/商店/套装/合成长出来后,两套并存会反复绊人。
+- **证据**:`PROJECT_STRUCTURE.md` 第 57 行 ⚠️ 注。
 
 ### R2. 地图是写死的线性结构(分支地图的真正拦路石)　⬜
 - **问题**:`RunManager.nodes: Array` + `depth: int` 索引——**线性数组+整数下标表达不了分支**(杀戮尖塔式一节点连多后继)。

@@ -4,7 +4,7 @@
 > **不是要全做** —— 这类游戏的深度更多来自 **proc 之间的咬合**（第 8 节）而非裸属性堆叠。
 >
 > 标记：✓ 已有　◐ 半有/可泛化　➕ 全新
-> 关联：`docs/COMBAT_REVAMP_AUTOBATTLER.md`（玩法方向）、`scripts/experiments/BackpackModel.gd`（物品/属性来源）、`scripts/systems/combat/`（战斗实现）
+> 关联：`docs/COMBAT_REVAMP_AUTOBATTLER.md`（玩法方向）、`scripts/systems/backpack/BackpackModel.gd`（物品/属性来源）、`scripts/systems/combat/`（战斗实现）
 
 ---
 

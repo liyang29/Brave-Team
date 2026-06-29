@@ -3,7 +3,7 @@ extends GutTest
 # RunManager（autoload）跑局状态机的最小验证。
 # 设计：起手空队，在村庄(商店+招募合一)组建；地图 村庄→战→村庄→战→泉水→战→魔王。
 
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 

@@ -8,7 +8,7 @@ extends GutTest
 # 数值不达标就回 RunManager._build_map 拧敌人，再跑本测试。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const TRIALS := 20
 
 

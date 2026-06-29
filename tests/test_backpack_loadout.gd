@@ -9,7 +9,7 @@ extends GutTest
 #   - HP 做法 A：full_heal=false 钳血、加 +HP 装备不回血、上限回落时 current 钳下来
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 
 
 func _hero(cls: int) -> Hero:

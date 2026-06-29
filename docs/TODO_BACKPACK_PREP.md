@@ -41,7 +41,7 @@
 
 ## 修订后的切法（按此顺序执行）
 
-- **✅ Step 1（已完成）抽 builder**：`scripts/systems/BackpackLoadout.gd` 的 `build_party(loadouts, squad_slots, full_heal)`，实验改调它（`full_heal=true`），跑局将传 `false` 钳血。配 `test_backpack_loadout.gd`（含幂等、HP做法A）。
+- **✅ Step 1（已完成）抽 builder**：`scripts/systems/backpack/BackpackLoadout.gd` 的 `build_party(loadouts, squad_slots, full_heal)`，实验改调它（`full_heal=true`），跑局将传 `false` 钳血。配 `test_backpack_loadout.gd`（含幂等、HP做法A）。
 - **✅ Step 2（已完成）状态进 RunManager**：名册 `roster=[{hero,base,grid}]` + `owned_items` 库存 + `squad_slots` 站位，`start_run` 初始化（空背包/空库存/默认站位），`party` 改为名册视图。裸 base 暂用占位高值（低值留到 Step 3）。扩 `test_run_manager`。
 - **✅ Step 3（已完成）抽 `BackpackPrepPanel` + Encounter 用它**：共享编辑组件 `scripts/ui/BackpackPrepPanel.gd`（VBoxContainer，按引用操作 roster/owned_items/squad_slots）。实验场景 + Encounter 都改用它。Encounter 开战前嵌入 → 调 `build_party(full_heal=false)` 钳血 → simulate → resolve。配 `test_backpack_prep_panel`（放入/退回/校验）+ RunManager 端到端战斗路径测试。
   - ~~DEBUG 起手种子~~ → **Step 4 已删，库存改回空 `{}`**。
@@ -54,8 +54,8 @@
 ---
 
 ## 相关文件速查
-- `scripts/experiments/BackpackModel.gd`（复用 + 加 rarity）
+- `scripts/systems/backpack/BackpackModel.gd`（复用 + 加 rarity）
 - `scripts/experiments/BackpackExperiment.gd:426`（要抽的转换逻辑）+ 250 行 UI（要抽成 Panel）
 - `scripts/autoload/RunManager.gd`（加 grids/owned_items/squad_slots + DRAFT 状态）
 - `scripts/ui/Encounter.gd`（嵌 prep panel）
-- 新建：`scripts/systems/BackpackLoadout.gd`、`scripts/ui/BackpackPrepPanel.gd`、战利品 draft 界面
+- 新建：`scripts/systems/backpack/BackpackLoadout.gd`、`scripts/ui/BackpackPrepPanel.gd`、战利品 draft 界面

@@ -22,7 +22,7 @@ extends RefCounted
 # 缓存时序问题。实验场景与 Encounter 都 preload 本文件、调静态函数。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 
 ## 把若干英雄的背包 loadout 翻译成一支配置好的 Party（未开战）。

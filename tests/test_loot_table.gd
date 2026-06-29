@@ -5,7 +5,7 @@ extends GutTest
 # ─────────────────────────────────────────────────────────────────────────────
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 
 func test_every_item_has_known_rarity() -> void:

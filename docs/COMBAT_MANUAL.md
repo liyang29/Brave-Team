@@ -2,7 +2,7 @@
 
 > 回合制 + 自动结算。玩家不手动指挥，**操控全在战前**（配技能书 / 摆站位 / 给装备）。
 > 本手册讲清"开打后引擎怎么决策、伤害怎么算"。实现：`scripts/systems/combat/`。
-> 数据：技能 `utils/SkillTable.gd`、怪物 `factories/MonsterFactory.gd`、副属性/协同 `experiments/BackpackModel.gd`。
+> 数据：技能 `utils/SkillTable.gd`、怪物 `factories/MonsterFactory.gd`、副属性/协同 `systems/backpack/BackpackModel.gd`。
 
 ---
 

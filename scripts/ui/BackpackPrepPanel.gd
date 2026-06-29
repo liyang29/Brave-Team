@@ -14,8 +14,8 @@ extends VBoxContainer
 #   squad_slots : { Vector2i(col,row): Hero }  row0 前排 / row1 后排
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const DragSlot = preload("res://scripts/ui/DragSlot.gd")
 
 const BAG_COLS := 3

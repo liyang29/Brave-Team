@@ -54,12 +54,20 @@
 | `items/Equipment.gd` | `class_name`，`extends Item` | 装备 |
 | `items/Consumable.gd` | `class_name`，`extends Item` | 消耗品 |
 
-> ⚠️ 注意：`entities/items/` 的 Item/Equipment/Consumable 是**旧实体物品体系**。当前背包实验的物品走 `experiments/BackpackModel.gd` 的 `ITEMS` 字典，**两者目前未打通**（背包用的是轻量 id+dict，不是这些 Resource）。
+> ⚠️ 注意：`entities/items/` 的 Item/Equipment/Consumable 是**旧实体物品体系**。当前背包实验的物品走 `systems/backpack/BackpackModel.gd` 的 `ITEMS` 字典，**两者目前未打通**（背包用的是轻量 id+dict，不是这些 Resource）。
 
 ### `scripts/systems/`（系统层）
 | 文件 | 属性 | 职责 |
 |------|------|------|
 | `Party.gd` | **运行时**，`class_name`，`extends RefCounted` | 队伍 + 站位编队(formation_cell) + positioning_mode + 冷却/副属性注入。`create()` / `set_row` / `set_skill_cd` / `set_extra_stats` |
+| `LootTable.gd` | **纯数据/函数**，无 class_name（preload） | 战利品掉落/商店上货（rarity 加权）+ 定价。`draw_draft` / `price` |
+| `PowerScore.gd` | **纯函数**，无 class_name（preload） | 战力分：`unit_power`/`enemy_power`/`hero_power`/`item_power`（含暴击/闪避/光环折算） |
+
+#### `scripts/systems/backpack/`（背包构筑核心，从 experiments/ 迁入）
+| 文件 | 属性 | 职责 |
+|------|------|------|
+| `backpack/BackpackModel.gd` | **纯数据/函数**，`extends RefCounted`，无 class_name（preload） | 背包物品表 `ITEMS` + 协同 `SYNERGIES` + 光环 `aura` + 副属性 `EXTRA_KEYS` + `compute(grid)`。背包计算引擎，被 ~7 个生产文件 preload |
+| `backpack/BackpackLoadout.gd` | **纯函数**，`extends RefCounted`，无 class_name（preload） | 背包→可战斗 `Party` 翻译器：裸 base + compute + 光环注入 + 站位/冷却/副属性。`build_party` / `squad_stats`（幂等、HP 钳血做法 A） |
 
 #### `scripts/systems/combat/`（战斗核心）
 | 文件 | 属性 | 职责 |
@@ -95,11 +103,11 @@
 |------|------|------|
 | `SkillTable.gd` | `class_name`（隐式 RefCounted），静态数据表 | 技能数据表（倍率/类型/冷却/职业/name_zh）。伤害在 Simulator 实时算 |
 
-### `scripts/experiments/`（脏实验，背包核心在此）
+### `scripts/experiments/`（脏实验/沙盒场景）
+> 背包计算核心 `BackpackModel`/`BackpackLoadout` 已迁出到 `systems/backpack/`（见上）；本目录现仅余沙盒**场景**。
 | 文件 | 属性 | 职责 |
 |------|------|------|
-| `BackpackModel.gd` | **纯数据/函数**，`extends RefCounted`，**无 class_name（preload）** | 背包物品表 `ITEMS` + 协同 `SYNERGIES` + `compute(grid)`。背包引擎，可测可复用 |
-| `BackpackExperiment.gd` | 视觉层，`extends Control`，无 class_name | 背包构筑主实验（代码搭 UI）。**当前主玩法核心** |
+| `BackpackExperiment.gd` | 视觉层，`extends Control`，无 class_name | 背包构筑**沙盒场景**（代码搭 UI，单场满血试玩）。非游戏入口（入口是 `TitleScreen`→跑局），供独立调试背包手感 |
 | `GridExperiment.gd` | 视觉层，`extends Control` | 网格站位 + 逐列掩护（硬触及）实验 |
 | `PositionExperiment.gd` | 视觉层，`extends Control` | 2 排站位（硬触及）实验 |
 
@@ -148,7 +156,7 @@
 
 ## 已知待整理（与本结构相关）
 > 完整架构风险/技术债清单(R1–R8,带状态与落地顺序)见 **`docs/ARCHITECTURE_RISKS.md`**。下面是与本结构最相关的几条摘录。
-- `entities/items/`（Resource 物品体系）与 `experiments/BackpackModel.gd`（dict 物品体系）**未打通**，未来需定夺统一方案。（R1）
+- `entities/items/`（Resource 物品体系）与 `systems/backpack/BackpackModel.gd`（dict 物品体系）**未打通**，未来需定夺统一方案。（R1）
 - `HeroFactory.CLASS_STRATEGIES` 死数据待清理。
 - ~~无 MonsterFactory~~ → ✅ 已抽 `MonsterFactory` + `ENEMIES` 表，内联怪物已收编。
 - 后期内容扩展（更多怪/Boss/节点/地图）方案见 `docs/SCALING_ROADMAP.md`。

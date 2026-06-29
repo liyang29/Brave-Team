@@ -12,8 +12,8 @@ extends Control
 # 运行：以本场景为主场景启动，或编辑器 F6 运行 BackpackExperiment.tscn。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
 
 # 共享物品池（item_id -> 数量）

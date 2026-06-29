@@ -7,7 +7,7 @@ extends GutTest
 # 同时锁定 BackpackModel.compute 的邻接协同计算。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const TRIALS := 20
 
 # ── 协同计算单测（确定性，无 RNG）─────────────────────────────────────────────

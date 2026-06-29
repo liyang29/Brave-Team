@@ -8,7 +8,7 @@ extends Control
 # ─────────────────────────────────────────────────────────────────────────────
 
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 
 const CLASS_ZH := {

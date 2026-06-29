@@ -9,9 +9,9 @@ extends Control
 
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
 const SCENE_DRAFT := "res://scenes/run/Draft.tscn"
-const Loadout = preload("res://scripts/systems/BackpackLoadout.gd")
+const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 var _prep
 var _hp_box: VBoxContainer

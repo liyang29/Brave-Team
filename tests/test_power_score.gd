@@ -5,7 +5,7 @@ extends GutTest
 # ─────────────────────────────────────────────────────────────────────────────
 
 const Power = preload("res://scripts/systems/PowerScore.gd")
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 
 # ── 物品战力 ──────────────────────────────────────────────────────────────────

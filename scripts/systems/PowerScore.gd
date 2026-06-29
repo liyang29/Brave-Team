@@ -18,7 +18,7 @@ extends RefCounted
 # 故意不带 class_name（preload 引入），同 BackpackModel 路子。
 # ─────────────────────────────────────────────────────────────────────────────
 
-const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 
 # ── 1) 单位战力（有效血量 × 输出）──────────────────────────────────────────────

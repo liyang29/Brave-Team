@@ -45,7 +45,7 @@ Godot 可执行路径在环境变量 `$env:GODOT_PATH`（PowerShell）。
 | `utils/SkillTable.gd` | 技能数据表（倍率/类型/冷却等；伤害在 Simulator 实时算）|
 | `systems/Party.gd` | 队伍 + 站位编队（formation_cell）+ positioning_mode + 冷却/副属性注入 |
 | `systems/factories/HeroFactory.gd` | 按职业造英雄、注入策略 |
-| `experiments/BackpackModel.gd` | 背包物品表 + 邻接协同 + compute()（纯数据/函数，preload 引入，无 class_name）|
+| `systems/backpack/BackpackModel.gd` | 背包物品表 + 邻接协同 + compute()（纯数据/函数，preload 引入，无 class_name）|
 | `experiments/BackpackExperiment.gd` | 背包构筑主实验场景（代码搭 UI）|
 
 ## 关键机制要点

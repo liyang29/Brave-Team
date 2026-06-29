@@ -64,8 +64,28 @@
 roguelike 无法保证每个玩家心流不断（方差是 genre 灵魂）；目标是把带控在合理范围、不是完美直线；**别硬锁胜率**（杀 build-matters）。
 
 ### 落地第一步（代码）
-1. `item_power(id)` / `enemy_power(data)` 两个纯函数（属性加权→一个数）。
-2. `budget(depth)` 曲线 + "按预算凑怪"的生成器（替代手摆地图）。
-3. 用现有 `test_balance` harness 验证曲线（基准 build 各深度胜率是否落带）。
+1. ✅ **已做**：`scripts/systems/PowerScore.gd`——战力分纯函数（见下"用法"）。
+2. ⬜ `budget(depth)` 曲线 + "按预算凑怪"的生成器（替代手摆地图）。
+3. ⬜ 用现有 `test_balance` harness 验证曲线（基准 build 各深度胜率是否落带）。
+
+### 已落地：PowerScore 用法
+`const Power = preload("res://scripts/systems/PowerScore.gd")`
+
+| 函数 | 作用 | 尺度 |
+|------|------|------|
+| `unit_power(hp,atk,def,magic,spd, crit_chance=0, crit_dmg=0)` | 通用单位战斗评级 = 有效血量×输出×速度 | 大（百~千） |
+| `enemy_power(EnemyData)` | 怪物战力（套 unit_power） | 同上 |
+| `group_power([EnemyData...])` | 一组怪总战力 = 遭遇"预算" | 同上 |
+| `hero_power({base, grid})` | 英雄含背包战力（裸base+背包compute，暴击折进输出） | **同 enemy_power** |
+| `team_power([名册条目...])` | 队伍总战力 = 各人之和 | 同上 |
+| `item_power(item_id)` | 单件装备属性加权分（防>血、暴击按百分点、技能书基础分） | 小（几~几十），**仅用于排序/定价/掉落，别和单位分比** |
+
+**关键**：`hero_power`/`team_power` 与 `enemy_power`/`group_power` **同尺度**，可直接求难度比值：
+```gdscript
+var ratio = Power.group_power(node.enemies) / Power.team_power(RunManager.roster)
+# ratio 越大越难；配合逻辑斯蒂可换算成预期胜率
+```
+**用途**：① 遭遇预算生成(按 group_power 凑怪到目标比值) ② 掉落/商店按 item_power 分级定价 ③ 喂 harness 校准曲线。
+**注意**：所有权重(`W_DEF` 等)与系数(`DEF_TO_EHP` 等)都是可调旋钮，先用直觉值、后用 harness 校准；`item_power` 与单位分量纲不同，不可混比。
 
 **一句话**：万物给 power 分(应对膨胀) → 逻辑斯蒂锁胜率带(应对心流) → 软上限收方差 + 模拟当尺子(应对随机) → 程序生成关卡(应对 100 关)。

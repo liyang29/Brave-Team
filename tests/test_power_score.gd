@@ -56,3 +56,39 @@ func test_group_power_sums() -> void:
 	var one: EnemyData = MonsterFactory.create("wolf")
 	var two: Array = [MonsterFactory.create("wolf"), MonsterFactory.create("wolf")]
 	assert_almost_eq(Power.group_power(two), Power.enemy_power(one) * 2.0, 0.001, "两只野狼=单只×2")
+
+
+# ── 英雄 / 队伍战力 ────────────────────────────────────────────────────────────
+
+func _entry(grid: Dictionary) -> Dictionary:
+	return { "base": { "hp": 90, "atk": 6, "def": 8, "magic": 0, "spd": 9, "mp": 40 }, "grid": grid }
+
+func test_hero_power_rises_with_gear() -> void:
+	var bare := Power.hero_power(_entry({}))
+	var armed := Power.hero_power(_entry({ Vector2i(0,0): "iron_sword" }))
+	assert_gt(armed, bare, "装上铁剑→英雄战力上升")
+
+func test_hero_power_counts_synergy() -> void:
+	# 开刃(剑+磨刀石相邻) 应高于 只放一把剑
+	var sword := Power.hero_power(_entry({ Vector2i(0,0): "iron_sword" }))
+	var combo := Power.hero_power(_entry({ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone" }))
+	assert_gt(combo, sword, "凑出开刃协同→战力更高")
+
+func test_hero_power_counts_crit() -> void:
+	var no_crit := Power.hero_power(_entry({ Vector2i(0,0): "iron_sword" }))
+	var crit := Power.hero_power(_entry({ Vector2i(0,0): "iron_sword", Vector2i(1,0): "crit_gem" }))
+	assert_gt(crit, no_crit, "加暴击宝石→战力更高（暴击折进输出）")
+
+func test_team_power_sums_heroes() -> void:
+	var a := _entry({ Vector2i(0,0): "iron_sword" })
+	var b := _entry({ Vector2i(0,0): "shield" })
+	assert_almost_eq(Power.team_power([a, b]), Power.hero_power(a) + Power.hero_power(b), 0.001,
+		"队伍战力=各人之和")
+
+func test_hero_and_enemy_same_scale() -> void:
+	# 同尺度健全性检查：一个建好背包的英雄，量级应和怪物可比（不是天差地别）
+	var hero := Power.hero_power(_entry({
+		Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(0,1): "shield" }))
+	var wolf := Power.enemy_power(MonsterFactory.create("wolf"))
+	assert_gt(hero, 0.0, "英雄战力>0")
+	assert_gt(hero, wolf * 0.2, "英雄与野狼同量级（非数量级差异）")

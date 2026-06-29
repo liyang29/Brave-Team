@@ -140,23 +140,26 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 
 
 ## 光环命中判定：scope 下，提供者 i 的光环是否作用到受益者 j。
-##   team      = 全队（含自己）
-##   adjacent  = 站位正交相邻（不含自己；双方都需有站位格）
-##   same_row  = 跟提供者同排（相对；不含自己；双方都需站位格）
-##   front_row = 指定前排(row0)全体（绝对；含自己若在前排；只需受益者有站位格）
-##   back_row  = 指定后排(row1)全体（绝对；含自己若在后排）
+## 统一规则：**只要受益者落在范围内就生效，含持有者本人**（带旗的人自己也吃）。
+##   team      = 全队
+##   adjacent  = 自己 + 正交相邻格
+##   same_row  = 跟提供者同排（含自己）
+##   front_row = 前排(row0)全体（绝对，含自己若在前排）
+##   back_row  = 后排(row1)全体（绝对，含自己若在后排）
 static func _aura_hits(scope: String, i: int, j: int, pcell, rcell) -> bool:
 	match scope:
 		"team":
 			return true
 		"adjacent":
-			if i == j or pcell == null or rcell == null:
+			if i == j:
+				return true                       # 含自己
+			if pcell == null or rcell == null:
 				return false
 			return abs(pcell.x - rcell.x) + abs(pcell.y - rcell.y) == 1
 		"same_row":
-			if i == j or pcell == null or rcell == null:
+			if pcell == null or rcell == null:
 				return false
-			return pcell.y == rcell.y
+			return pcell.y == rcell.y             # 同排，含自己
 		"front_row":
 			return rcell != null and rcell.y == 0
 		"back_row":

@@ -110,6 +110,7 @@
 
 ### 路线
 - ✅ **第一切片（已做）站位光环**：物品 `aura: {scope, 属性...}`；`BackpackModel.grid_auras` 提取，`BackpackLoadout.build_party` 阶段2按 scope 注入。scope 支持 **team / adjacent / same_row(相对同排) / front_row·back_row(绝对前后排)**。已加 军旗(全队+攻)/疾风图腾(相邻+速)/铁壁旗(同排+防)/先锋号角(前排+攻)/守护图腾(后排+防血)；tooltip/商店显示光环；`PowerScore` 给光环算分。配 GUT(全队含自己/相邻/同排/前排/后排)。
-  - **same_row vs front_row 区别**：same_row=跟持有者同排(相对)；front_row/back_row=指定前/后排(绝对，后排持有者也能 buff 全体前排)。
+  - **统一规则：光环都含持有者本人**（带旗的人自己也吃，若在范围内）。adjacent=自己+相邻格；same_row=自己所在排；front_row/back_row=指定前/后排(绝对)。
+  - **same_row vs front_row 区别**：same_row=跟持有者同排(相对，holder 站前就加前排)；front_row/back_row=固定前/后排(绝对，后排持有者也能 buff 全体前排)。
 - **Backlog（第二档战斗钩子）**：① 闪避关键词(几率免伤，做"闪避T") ② 嘲讽做成物品/光环可带 ③ 伤害转移/分摊 ④ 事件触发型队级效果。
 - **以后加光环料 = 给物品加 `aura` 字段一行**（scope 已支持 team/adjacent/same_row；要新 scope 在 `_aura_hits` 加分支）。

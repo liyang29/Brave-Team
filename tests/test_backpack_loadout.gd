@@ -169,7 +169,7 @@ func test_adjacent_aura_only_hits_neighbor() -> void:
 	var slots := { Vector2i(0,0): carrier, Vector2i(0,1): near, Vector2i(2,1): far }
 	Loadout.build_party(loadouts, slots, true)
 	assert_eq(near.base_speed, 12 + 3, "相邻队友 +3 速")
-	assert_eq(carrier.base_speed, 9, "自己不吃相邻光环")
+	assert_eq(carrier.base_speed, 9 + 3, "持有者自己也吃(含自己)")
 	assert_eq(far.base_speed, 9, "非相邻不吃")
 
 func test_same_row_aura() -> void:
@@ -184,6 +184,7 @@ func test_same_row_aura() -> void:
 	]
 	var slots := { Vector2i(0,0): carrier, Vector2i(1,0): same, Vector2i(0,1): other }
 	Loadout.build_party(loadouts, slots, true)
+	assert_eq(carrier.base_defense, 8 + 4, "持有者同排,自己也吃 +4")
 	assert_eq(same.base_defense, 5 + 4, "同排队友 +4 防")
 	assert_eq(other.base_defense, 3, "异排不吃")
 

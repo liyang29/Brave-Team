@@ -200,7 +200,7 @@ static func item_tooltip(item_id: String) -> String:
 	if hint != "":
 		lines.append("协同：" + hint)
 	if it.has("aura"):
-		lines.append("光环：" + aura_text(it["aura"]) + "（按站位作用于队友）")
+		lines.append("光环：" + aura_text(it["aura"]) + "（含自己 + 范围内队友，按站位）")
 	return "\n".join(lines)
 
 

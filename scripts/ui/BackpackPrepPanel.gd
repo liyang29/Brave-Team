@@ -158,6 +158,8 @@ func _build_hero_panel(index: int) -> Control:
 
 func refresh() -> void:
 	_rebuild_pool()
+	# 全队最终属性（含光环），与开战时一致——保证"看到的=打出来的"
+	var squad: Array = Loadout.squad_stats(_roster, _squad_slots)
 	for i in range(_roster.size()):
 		var grid: Dictionary = _roster[i]["grid"]
 		var cells: Dictionary = _bag_slots[i]
@@ -169,7 +171,7 @@ func refresh() -> void:
 			else:
 				slot.set_display("·", Color(1, 1, 1))
 				slot.tooltip_text = ""
-		_stat_labels[i].text = _stat_text(_roster[i])
+		_stat_labels[i].text = _stat_text(_roster[i], squad[i])
 	for cell in _squad_ui:
 		var h = _squad_slots.get(cell)
 		if h != null:
@@ -194,9 +196,9 @@ func _rebuild_pool() -> void:
 		slot.tooltip_text = Backpack.item_tooltip(item_id)
 
 
-func _stat_text(entry: Dictionary) -> String:
+func _stat_text(entry: Dictionary, fs: Dictionary) -> String:
+	# fs = 该英雄最终属性（含光环）；b = 自身背包（协同/技能/暴击显示用）
 	var grid: Dictionary = entry["grid"]
-	var base: Dictionary = entry["base"]
 	var b: Dictionary = Backpack.compute(grid)
 	var syn := ""
 	if not b["synergies"].is_empty():
@@ -220,9 +222,7 @@ func _stat_text(entry: Dictionary) -> String:
 		if float(ex.get("crit_dmg", 0.0)) > 0.0:
 			crit_txt += "/暴伤+%d%%" % int(float(ex["crit_dmg"]) * 100)
 	return "攻%d 防%d 血%d 魔%d 蓝%d%s%s%s" % [
-		int(base["atk"]) + int(b["atk"]), int(base["def"]) + int(b["def"]),
-		int(base["hp"]) + int(b["hp"]), int(base["magic"]) + int(b["magic"]),
-		int(base.get("mp", 0)) + int(b.get("mp", 0)),
+		int(fs["atk"]), int(fs["def"]), int(fs["hp"]), int(fs["magic"]), int(fs["mp"]),
 		crit_txt, syn, skill_line]
 
 

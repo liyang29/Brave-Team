@@ -32,21 +32,21 @@ const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
 ## squad_slots: { Vector2i(col,row): Hero }  row0=前排 / row1=后排（soft_row）
 ## full_heal: true=开战满血（实验）；false=钳血（跑局消耗战）
 ## 返回：Party（positioning_mode=soft_row，站位/冷却/副属性已注入）
-static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: bool) -> Party:
+## 计算全队"最终属性"（裸 base + 自身背包 + 小队光环）。
+## 返回 Array[{hp,atk,def,magic,spd,mp}]，与 loadouts 同序。
+## 面板显示与开战建队共用同一套，保证"看到的=打出来的"。
+static func squad_stats(loadouts: Array, squad_slots: Dictionary) -> Array:
 	var n: int = loadouts.size()
-	# hero → 站位格（光环按站位算 scope 用）
 	var cell_of: Dictionary = {}
 	for cell in squad_slots:
 		if squad_slots[cell] != null:
 			cell_of[squad_slots[cell]] = cell
 
-	# ── 阶段1：各人"自身"最终属性（裸 base + 自身背包）；同时存 compute 结果 ──
-	var stats: Array = []     # 每人 { hp,atk,def,magic,spd,mp }
-	var self_b: Array = []    # 每人 compute（留给技能/副属性）
+	# 阶段1：各人自身最终属性
+	var stats: Array = []
 	for entry in loadouts:
 		var base: Dictionary = entry["base"]
 		var b: Dictionary = Backpack.compute(entry["grid"])
-		self_b.append(b)
 		stats.append({
 			"hp":    int(base["hp"])    + int(b["hp"]),
 			"atk":   int(base["atk"])   + int(b["atk"]),
@@ -56,7 +56,7 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 			"mp":    int(base["mp"])    + int(b.get("mp", 0)),
 		})
 
-	# ── 阶段2：小队光环——每个提供者的 aura 按 scope 找受益者，加属性 ──
+	# 阶段2：小队光环按 scope 注入
 	for i in range(n):
 		var auras: Array = Backpack.grid_auras(loadouts[i]["grid"])
 		if auras.is_empty():
@@ -70,15 +70,21 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 				for k in ["atk", "def", "hp", "magic", "spd", "mp"]:
 					if aura.has(k):
 						stats[j][k] += int(aura[k])
+	return stats
 
-	# ── 阶段3：把（自身+光环）属性应用到英雄 + HP%保留 + 技能/冷却/副属性 ──
+
+static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: bool) -> Party:
+	var n: int = loadouts.size()
+	var stats: Array = squad_stats(loadouts, squad_slots)   # 自身+光环，与面板一致
+
+	# ── 应用到英雄 + HP%保留 + 技能/冷却/副属性 ──
 	var heroes: Array = []
 	var cd_map: Dictionary = {}
 	var extra_map: Dictionary = {}
 	for i in range(n):
 		var hero = loadouts[i]["hero"]
 		var st: Dictionary = stats[i]
-		var b: Dictionary = self_b[i]
+		var b: Dictionary = Backpack.compute(loadouts[i]["grid"])   # 自身（技能书/副属性用）
 
 		var old_max: int = hero.get_max_hp()
 		var old_cur: int = hero.current_hp

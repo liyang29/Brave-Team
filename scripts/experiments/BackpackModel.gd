@@ -27,6 +27,12 @@ const ITEMS: Dictionary = {
 	"charm":       { "name": "红宝石", "hp": 20, "tag": "vital",    "rarity": "rare" },
 	"mana_charm":  { "name": "法力护符", "mp": 30, "magic": 2, "tag": "arcane", "rarity": "rare" },
 
+	# ── 小队光环装备（aura：跨英雄加成，按 scope 作用范围，在 build_party 注入）──
+	# scope: "team"=全队(含自己) / "adjacent"=相邻站位(不含自己) / "same_row"=同排(不含自己)
+	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "aura": { "scope": "team",     "atk": 4 } },
+	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "aura": { "scope": "adjacent", "spd": 3 } },
+	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "aura": { "scope": "same_row", "def": 4 } },
+
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
 	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic" },
 	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare" },
@@ -113,6 +119,28 @@ static func compute(grid: Dictionary) -> Dictionary:
 static func item_name(item_id: String) -> String:
 	return ITEMS.get(item_id, {}).get("name", item_id)
 
+## 提取一个背包里所有"光环"(aura)，返回 Array[{scope, atk/def/hp/magic/spd/mp...}]。
+## 光环是跨英雄效果，不进 compute（那是自身属性）；由 BackpackLoadout 按 scope 注入。
+static func grid_auras(grid: Dictionary) -> Array:
+	var out: Array = []
+	for cell in grid:
+		var it: Dictionary = ITEMS.get(grid[cell], {})
+		if it.has("aura"):
+			out.append(it["aura"])
+	return out
+
+const _SCOPE_ZH: Dictionary = { "team": "全队", "adjacent": "相邻", "same_row": "同排" }
+const _STAT_ZH: Dictionary = { "atk": "攻", "def": "防", "hp": "血", "magic": "魔", "spd": "速", "mp": "蓝" }
+
+## 光环效果的中文短描述，如 "全队 攻+4"
+static func aura_text(aura: Dictionary) -> String:
+	var scope: String = _SCOPE_ZH.get(aura.get("scope", "team"), "全队")
+	var parts: Array = []
+	for k in _STAT_ZH:
+		if int(aura.get(k, 0)) != 0:
+			parts.append("%s+%d" % [_STAT_ZH[k], int(aura[k])])
+	return "%s %s" % [scope, " ".join(parts)]
+
 ## 物品简短属性描述（UI 用）
 static func item_desc(item_id: String) -> String:
 	var it: Dictionary = ITEMS.get(item_id, {})
@@ -126,6 +154,7 @@ static func item_desc(item_id: String) -> String:
 	if int(it.get("mp", 0)) != 0:    parts.append("蓝+%d" % it["mp"])
 	if float(it.get("crit_chance", 0.0)) != 0.0: parts.append("暴击+%d%%" % int(it["crit_chance"] * 100))
 	if float(it.get("crit_dmg", 0.0)) != 0.0:    parts.append("暴伤+%d%%" % int(it["crit_dmg"] * 100))
+	if it.has("aura"):                           parts.append("光环:" + aura_text(it["aura"]))
 	return "%s(%s)" % [it.get("name", item_id), ", ".join(parts)]
 
 
@@ -168,6 +197,8 @@ static func item_tooltip(item_id: String) -> String:
 	var hint: String = _TAG_HINT.get(it.get("tag", ""), "")
 	if hint != "":
 		lines.append("协同：" + hint)
+	if it.has("aura"):
+		lines.append("光环：" + aura_text(it["aura"]) + "（按站位作用于队友）")
 	return "\n".join(lines)
 
 

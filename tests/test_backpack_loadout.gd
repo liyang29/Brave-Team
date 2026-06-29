@@ -139,3 +139,50 @@ func test_backpack_mp_added_to_base() -> void:
 	var m := _hero(Hero.HeroClass.MAGE)
 	Loadout.build_party([{ "hero": m, "base": _base(55,3,3,5,12,70), "grid": { Vector2i(0,0): "mana_charm" } }], {}, true)
 	assert_eq(m.base_mp, 70 + 30, "法力护符 +30 蓝加到 base_mp")
+
+
+# ── 小队光环（站位协同）──────────────────────────────────────────────────────
+
+func test_team_aura_buffs_all_including_self() -> void:
+	# 军旗(全队+4攻)：持有者和队友都 +4
+	var carrier := _hero(Hero.HeroClass.WARRIOR)
+	var ally := _hero(Hero.HeroClass.MAGE)
+	var loadouts := [
+		{ "hero": carrier, "base": _base(90,6,8,0,9,40), "grid": { Vector2i(0,0): "war_banner" } },
+		{ "hero": ally, "base": _base(55,3,3,5,12,70), "grid": {} },
+	]
+	var slots := { Vector2i(0,0): carrier, Vector2i(0,1): ally }
+	Loadout.build_party(loadouts, slots, true)
+	assert_eq(carrier.base_attack, 6 + 4, "军旗全队加成含自己：6+4")
+	assert_eq(ally.base_attack, 3 + 4, "队友也 +4：3+4")
+
+func test_adjacent_aura_only_hits_neighbor() -> void:
+	# 疾风图腾(相邻+3速)：只加相邻站位，不加自己、不加非相邻
+	var carrier := _hero(Hero.HeroClass.WARRIOR)   # (0,0)
+	var near := _hero(Hero.HeroClass.MAGE)         # (0,1) 相邻
+	var far := _hero(Hero.HeroClass.PRIEST)        # (2,1) 不相邻
+	var loadouts := [
+		{ "hero": carrier, "base": _base(90,6,8,0,9,40), "grid": { Vector2i(0,0): "speed_totem" } },
+		{ "hero": near, "base": _base(55,3,3,5,12,70), "grid": {} },
+		{ "hero": far, "base": _base(65,3,4,5,9,70), "grid": {} },
+	]
+	var slots := { Vector2i(0,0): carrier, Vector2i(0,1): near, Vector2i(2,1): far }
+	Loadout.build_party(loadouts, slots, true)
+	assert_eq(near.base_speed, 12 + 3, "相邻队友 +3 速")
+	assert_eq(carrier.base_speed, 9, "自己不吃相邻光环")
+	assert_eq(far.base_speed, 9, "非相邻不吃")
+
+func test_same_row_aura() -> void:
+	# 铁壁旗(同排+4防)：同排队友 +4，异排不加
+	var carrier := _hero(Hero.HeroClass.WARRIOR)   # (0,0) 前排
+	var same := _hero(Hero.HeroClass.ROGUE)        # (1,0) 同前排
+	var other := _hero(Hero.HeroClass.MAGE)        # (0,1) 后排
+	var loadouts := [
+		{ "hero": carrier, "base": _base(90,6,8,0,9,40), "grid": { Vector2i(0,0): "iron_standard" } },
+		{ "hero": same, "base": _base(70,7,5,0,16,50), "grid": {} },
+		{ "hero": other, "base": _base(55,3,3,5,12,70), "grid": {} },
+	]
+	var slots := { Vector2i(0,0): carrier, Vector2i(1,0): same, Vector2i(0,1): other }
+	Loadout.build_party(loadouts, slots, true)
+	assert_eq(same.base_defense, 5 + 4, "同排队友 +4 防")
+	assert_eq(other.base_defense, 3, "异排不吃")

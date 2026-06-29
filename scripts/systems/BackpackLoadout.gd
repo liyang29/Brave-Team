@@ -33,35 +33,70 @@ const Backpack = preload("res://scripts/experiments/BackpackModel.gd")
 ## full_heal: true=开战满血（实验）；false=钳血（跑局消耗战）
 ## 返回：Party（positioning_mode=soft_row，站位/冷却/副属性已注入）
 static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: bool) -> Party:
-	var heroes: Array = []
-	var cd_map: Dictionary = {}      # hero -> { skill_id: cd_turns }
-	var extra_map: Dictionary = {}   # hero -> { crit_chance: , ... }
+	var n: int = loadouts.size()
+	# hero → 站位格（光环按站位算 scope 用）
+	var cell_of: Dictionary = {}
+	for cell in squad_slots:
+		if squad_slots[cell] != null:
+			cell_of[squad_slots[cell]] = cell
 
+	# ── 阶段1：各人"自身"最终属性（裸 base + 自身背包）；同时存 compute 结果 ──
+	var stats: Array = []     # 每人 { hp,atk,def,magic,spd,mp }
+	var self_b: Array = []    # 每人 compute（留给技能/副属性）
 	for entry in loadouts:
-		var hero = entry["hero"]
 		var base: Dictionary = entry["base"]
 		var b: Dictionary = Backpack.compute(entry["grid"])
+		self_b.append(b)
+		stats.append({
+			"hp":    int(base["hp"])    + int(b["hp"]),
+			"atk":   int(base["atk"])   + int(b["atk"]),
+			"def":   int(base["def"])   + int(b["def"]),
+			"magic": int(base["magic"]) + int(b["magic"]),
+			"spd":   int(base["spd"]),
+			"mp":    int(base["mp"])    + int(b.get("mp", 0)),
+		})
 
-		# 属性：永远从裸 base 重算（幂等），背包加 攻/防/血/魔/蓝；速度背包不改
-		# 先记旧血量与百分比，再改上限（用于"上限变化按比例同步当前血"）
+	# ── 阶段2：小队光环——每个提供者的 aura 按 scope 找受益者，加属性 ──
+	for i in range(n):
+		var auras: Array = Backpack.grid_auras(loadouts[i]["grid"])
+		if auras.is_empty():
+			continue
+		var pcell = cell_of.get(loadouts[i]["hero"], null)
+		for aura in auras:
+			var scope: String = aura.get("scope", "team")
+			for j in range(n):
+				if not _aura_hits(scope, i, j, pcell, cell_of.get(loadouts[j]["hero"], null)):
+					continue
+				for k in ["atk", "def", "hp", "magic", "spd", "mp"]:
+					if aura.has(k):
+						stats[j][k] += int(aura[k])
+
+	# ── 阶段3：把（自身+光环）属性应用到英雄 + HP%保留 + 技能/冷却/副属性 ──
+	var heroes: Array = []
+	var cd_map: Dictionary = {}
+	var extra_map: Dictionary = {}
+	for i in range(n):
+		var hero = loadouts[i]["hero"]
+		var st: Dictionary = stats[i]
+		var b: Dictionary = self_b[i]
+
 		var old_max: int = hero.get_max_hp()
 		var old_cur: int = hero.current_hp
 		var hp_pct: float = (float(old_cur) / float(old_max)) if old_max > 0 else 1.0
-		hero.set("base_max_hp", int(base["hp"]) + int(b["hp"]))
-		hero.set("base_attack", int(base["atk"]) + int(b["atk"]))
-		hero.set("base_defense", int(base["def"]) + int(b["def"]))
-		hero.set("base_magic", int(base["magic"]) + int(b["magic"]))
-		hero.set("base_speed", int(base["spd"]))
-		hero.set("base_mp", int(base["mp"]) + int(b.get("mp", 0)))
+		hero.set("base_max_hp", st["hp"])
+		hero.set("base_attack", st["atk"])
+		hero.set("base_defense", st["def"])
+		hero.set("base_magic", st["magic"])
+		hero.set("base_speed", st["spd"])
+		hero.set("base_mp", st["mp"])
 		hero.stat_block.rebuild()
 
-		# HP：满血(实验) 或 保留血量百分比(跑局)。
-		# 按比例同步：满血加血上限仍满血；剩 60% 加上限只补到 60%；摘装备按比例缩 → 反复摘戴不白嫖。
+		# HP：满血 或 保留百分比（满血加血上限仍满血；摘装按比例缩；阵亡不复活）
 		var new_max: int = hero.get_max_hp()
 		if full_heal:
 			hero.current_hp = new_max
 		elif old_cur <= 0:
-			hero.current_hp = 0   # 阵亡不复活
+			hero.current_hp = 0
 		else:
 			hero.current_hp = clampi(int(round(hp_pct * new_max)), 1, new_max)
 
@@ -96,6 +131,25 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 		party.set_extra_stats(hero, extra_map[hero])
 
 	return party
+
+
+## 光环命中判定：scope 下，提供者 i 的光环是否作用到受益者 j。
+##   team     = 全队（含自己）
+##   adjacent = 站位正交相邻（不含自己；双方都需有站位格）
+##   same_row = 同排（不含自己；双方都需有站位格）
+static func _aura_hits(scope: String, i: int, j: int, pcell, rcell) -> bool:
+	match scope:
+		"team":
+			return true
+		"adjacent":
+			if i == j or pcell == null or rcell == null:
+				return false
+			return abs(pcell.x - rcell.x) + abs(pcell.y - rcell.y) == 1
+		"same_row":
+			if i == j or pcell == null or rcell == null:
+				return false
+			return pcell.y == rcell.y
+	return false
 
 
 ## Hero.HeroClass 枚举 → SkillTable.hero_class 字符串（技能书职业匹配用）

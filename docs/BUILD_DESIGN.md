@@ -108,6 +108,7 @@
   ```
 - **第二档·战斗行为型**（碰 BattleSimulator，靠后）：嘲讽(已部分有 `HAS_TAUNT`，做成物品可带) / **闪避**(新关键词，伤害结算前 roll 免伤) / 事件触发(`on_battle_event` 钩子已有)。
 
-### 路线（本轮已定）
-- **第一切片 = 站位光环**：相邻/同排 +属性，setup-time 第二遍注入，验证"build 外溢 + 摆位张力"。窄 scope 优先。
+### 路线
+- ✅ **第一切片（已做）站位光环**：物品 `aura: {scope, 属性...}`；`BackpackModel.grid_auras` 提取，`BackpackLoadout.build_party` 阶段2按 scope(team/adjacent/same_row) 注入。已加 军旗(全队+攻)/疾风图腾(相邻+速)/铁壁旗(同排+防)；tooltip/商店显示光环；`PowerScore` 给光环算分。配 GUT(全队含自己/相邻只命中邻居/同排)。
 - **Backlog（第二档战斗钩子）**：① 闪避关键词(几率免伤，做"闪避T") ② 嘲讽做成物品/光环可带 ③ 伤害转移/分摊 ④ 事件触发型队级效果。
+- **以后加光环料 = 给物品加 `aura` 字段一行**（scope 已支持 team/adjacent/same_row；要新 scope 在 `_aura_hits` 加分支）。

@@ -24,8 +24,8 @@ const ENEMIES: Dictionary = {
 	"stone_guard": { "name": "石卫", "hp": 120, "atk": 15, "def": 8, "spd": 6 },
 	"bandit":      { "name": "强盗", "hp": 100, "atk": 18, "def": 4, "spd": 10 },
 	"ranger":      { "name": "游侠", "hp": 75,  "atk": 16, "def": 2, "spd": 12, "row": "back", "ranged": true },
-	"demon_lord":  { "name": "魔王", "hp": 216, "atk": 19, "def": 11, "spd": 10 },
-	"claw_minion": { "name": "爪牙", "hp": 85,  "atk": 12, "def": 4, "spd": 9 },
+	"demon_lord":  { "name": "魔王", "hp": 238, "atk": 21, "def": 11, "spd": 10 },
+	"claw_minion": { "name": "爪牙", "hp": 90,  "atk": 13, "def": 4, "spd": 9 },
 
 	# ── 实验场景用（前排蛮兵 + 后排巫师）──────────────────────────────────────
 	"brute":     { "name": "蛮兵",   "hp": 90, "atk": 15, "def": 6, "spd": 8, "ai": EnemyData.AI_AGGRESSIVE },

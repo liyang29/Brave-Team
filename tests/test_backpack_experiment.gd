@@ -378,6 +378,27 @@ func test_basic_attack_applies_soft_row() -> void:
 	assert_between(logs2[0].damage, 18, 22, "reach 模式普攻不受站位影响≈20（±浮动）")
 
 
+func test_basic_attack_uses_higher_of_atk_magic() -> void:
+	# 法师/牧师式单位：魔 > 攻 → 普攻用魔力，且按魔法不吃后排站位减伤
+	var caster := BattleCombatant.new()
+	caster.attack = 3; caster.magic = 12; caster.row = "back"
+	var tgt := BattleCombatant.new()
+	tgt.defense = 0; tgt.row = "front"; tgt.current_hp = 200; tgt.max_hp = 200
+	var logs: Array = BattleSimulator._basic_attack(caster, tgt, "soft_row")
+	# 用魔力12（非攻3），后排发起但按魔法不吃 ×0.5 → ≈12（±浮动）；攻3×0.5 才是旧的软普攻
+	assert_between(logs[0].damage, 10, 14, "普攻取更高的魔力12，按魔法不吃后排减伤")
+
+
+func test_basic_attack_physical_when_atk_higher() -> void:
+	# 战士式：攻 > 魔 → 普攻按物理，后排发起吃 ×0.5
+	var fighter := BattleCombatant.new()
+	fighter.attack = 20; fighter.magic = 0; fighter.row = "back"
+	var tgt := BattleCombatant.new()
+	tgt.defense = 0; tgt.row = "front"; tgt.current_hp = 200; tgt.max_hp = 200
+	var logs: Array = BattleSimulator._basic_attack(fighter, tgt, "soft_row")
+	assert_between(logs[0].damage, 9, 11, "攻20后排物理普攻 ×0.5 ≈10（±浮动）")
+
+
 func test_unknown_skill_falls_back_to_basic_with_row_mult() -> void:
 	# 回归 bug：敌方 spellcaster 的占位 "enemy_spell" 是未知技能，
 	# 走回退分支时也必须应用站位修正（旧版漏算导致忽高忽低）

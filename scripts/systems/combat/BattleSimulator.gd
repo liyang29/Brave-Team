@@ -123,16 +123,20 @@ static func simulate(party, enemy_data_list: Array) -> BattleResult:
 
 # ── 技能/普攻执行 ─────────────────────────────────────────────────────────────
 
-# 标准普通攻击：暴击 + 站位修正（仅物理）+ 装备触发。普攻无技能、无蓝耗。
+# 标准普通攻击：取攻/魔里更高的那个 + 暴击 + 站位修正（仅物理）+ 装备触发。普攻无技能、无蓝耗。
 # 两处共用（skill_id 为空 / 未知技能回退），确保修正一致、不再漏算。
 static func _basic_attack(actor: BattleCombatant, target: BattleCombatant, pos_mode: String) -> Array:
 	var logs: Array = []
 	if _roll_dodge(target):
 		logs.append(_make_dodge_log(target))
 		return logs   # 完全免伤：不结算伤害、不触发装备/击杀
+	# 普攻用"攻/魔里更高的那个"——法师/牧师物理低，普攻不该跟着软。
+	# 类型随之定：用魔力则按魔法（不吃后排站位减伤，同其法术）；用攻击则按物理（吃站位）。
+	var use_magic := actor.magic > actor.attack
+	var base_dmg := actor.magic if use_magic else actor.attack
 	var crit_mult := _roll_crit(actor)
-	var row_mult := _row_damage_mult(actor, target, true, pos_mode)   # 普攻为物理，受站位修正
-	var dmg := target.take_damage(int(round(actor.attack * crit_mult * row_mult * _roll_variance())))
+	var row_mult := _row_damage_mult(actor, target, not use_magic, pos_mode)   # 仅物理受站位修正
+	var dmg := target.take_damage(int(round(base_dmg * crit_mult * row_mult * _roll_variance())))
 	var atk_log := TurnLog.attack(actor.source_name, target.source_name, dmg, not target.is_alive())
 	atk_log.is_crit = crit_mult > 1.0
 	logs.append(atk_log)

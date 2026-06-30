@@ -45,7 +45,7 @@ const ITEMS: Dictionary = {
 	# taunt：>0 = 优先被敌人攻击（吸火力保后排）。两者均走 extra 通路，同暴击。
 	# 设计：纯闪避/纯嘲讽件无属性 → 占格机会成本明显；坦克件嘲讽+防。
 	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare" },
-	"shadow_mantle":{ "name": "暗影披风", "dodge_chance": 0.30, "tag": "evasion", "rarity": "epic" },
+	"shadow_mantle":{ "name": "暗影披风", "def": 2, "dodge_chance": 0.10, "tag": "evasion", "rarity": "epic" },
 	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare" },
 	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common" },
 
@@ -54,6 +54,7 @@ const ITEMS: Dictionary = {
 	# 职业由对应技能的 SkillTable.hero_class 决定（实验里按持有者职业过滤）。
 	"book_slash":    { "name": "斩击书", "tag": "skillbook", "skill_id": "slash",     "cd": 1, "rarity": "common" },
 	"book_cleave":   { "name": "横扫书", "tag": "skillbook", "skill_id": "cleave",    "cd": 2, "rarity": "rare" },
+	"book_taunt":    { "name": "挑衅书", "tag": "skillbook", "skill_id": "taunt_roar", "cd": 2, "rarity": "common" },
 	"book_fireball": { "name": "火球书", "tag": "skillbook", "skill_id": "fireball",  "cd": 2, "rarity": "rare" },
 	"book_icelance": { "name": "冰枪书", "tag": "skillbook", "skill_id": "ice_lance", "cd": 1, "rarity": "rare" },
 	"book_heal":     { "name": "治疗书", "tag": "skillbook", "skill_id": "holy_heal", "cd": 1, "rarity": "common" },
@@ -84,14 +85,15 @@ static func compute(grid: Dictionary) -> Dictionary:
 	var magic: int = 0
 	var mp: int = 0
 	var fired: Array = []
-	var books: Array = []   # [{ "id": skill_id, "cd": cd_turns }]
+	var books: Array = []   # [{ "id": skill_id, "cd": cd_turns }]，已按摆放"读序"排序（见下）
+	var book_cells: Array = []   # 临时：[{ cell, id, cd }]，收集后按读序排序
 	var extra: Dictionary = {}   # 副属性累加（crit_chance 等）
 
 	# 物品基础属性（技能书无属性，只收集到 books）
 	for cell in grid:
 		var it: Dictionary = ITEMS.get(grid[cell], {})
 		if it.get("tag", "") == "skillbook":
-			books.append({ "id": it.get("skill_id", ""), "cd": int(it.get("cd", 0)) })
+			book_cells.append({ "cell": cell, "id": it.get("skill_id", ""), "cd": int(it.get("cd", 0)) })
 			continue
 		atk   += int(it.get("atk", 0))
 		def_v += int(it.get("def", 0))
@@ -102,6 +104,14 @@ static func compute(grid: Dictionary) -> Dictionary:
 		for k in EXTRA_KEYS:
 			if it.has(k):
 				extra[k] = float(extra.get(k, 0.0)) + float(it[k])
+
+	# 技能书按"读序"排序（上→下，每行左→右）→ 决定连招释放顺序（中间档：摆位=连招）
+	book_cells.sort_custom(func(a, b):
+		if a["cell"].y != b["cell"].y:
+			return a["cell"].y < b["cell"].y
+		return a["cell"].x < b["cell"].x)
+	for be in book_cells:
+		books.append({ "id": be["id"], "cd": be["cd"] })
 
 	# 邻接协同：每格只看右、下邻居，保证每对相邻只算一次
 	for cell in grid:

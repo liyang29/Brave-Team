@@ -17,7 +17,7 @@ const VENOM_CHANCE: float = 0.85
 func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatant:
 	return _target_lowest_defense(opponents)
 
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = []) -> String:
+func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	if randf() < VENOM_CHANCE:
 		return "venom_bolt"
 	return ""

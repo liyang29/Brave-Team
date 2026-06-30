@@ -27,7 +27,7 @@ func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatan
 			return bc
 	return opponents[0]
 
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = []) -> String:
+func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	if randf() < PIERCE_CHANCE:
 		return "plasma_pierce"
 	return ""

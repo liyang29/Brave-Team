@@ -16,7 +16,7 @@ const ENEMY_SKILL_CHANCE: float = 0.60
 func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatant:
 	return _target_lowest_defense(opponents)
 
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = []) -> String:
+func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	# 敌人技能系统扩展点：将来从 enemy_data.enemy_skills 随机取
 	# 目前按概率决定是否"施法"（施法时伤害由 BattleSimulator 用 magic 属性计算）
 	if randf() < ENEMY_SKILL_CHANCE:

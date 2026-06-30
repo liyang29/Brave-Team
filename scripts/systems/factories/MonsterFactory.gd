@@ -17,13 +17,15 @@ class_name MonsterFactory
 #   ai     : EnemyData.AI_*（默认 AI_BASIC_ATTACK）
 const ENEMIES: Dictionary = {
 	# ── 跑局线（村庄→林间→剧毒→泉水→废墟→魔王）──────────────────────────────
-	"wolf":        { "name": "野狼", "hp": 56, "atk": 10, "def": 2, "spd": 9 },
-	"venom_bug":   { "name": "毒虫", "hp": 45, "atk": 8,  "def": 1, "spd": 11, "row": "back", "ranged": true },
-	"stone_guard": { "name": "石卫", "hp": 93, "atk": 10, "def": 7, "spd": 6 },
-	"bandit":      { "name": "强盗", "hp": 78, "atk": 12, "def": 4, "spd": 10 },
-	"ranger":      { "name": "游侠", "hp": 60, "atk": 11, "def": 2, "spd": 12, "row": "back", "ranged": true },
-	"demon_lord":  { "name": "魔王", "hp": 222, "atk": 18, "def": 10, "spd": 10 },
-	"claw_minion": { "name": "爪牙", "hp": 84, "atk": 12, "def": 4, "spd": 9 },
+	# 数值经 test_balance harness 校准（英雄确定性选技后整体变强 → 抬高挑战匹配）：
+	# 主要抬"攻击"(atk−def/2 才有真威胁) + 适度抬血(拉长消耗战)，逐关 ramp。
+	"wolf":        { "name": "野狼", "hp": 70,  "atk": 14, "def": 2, "spd": 9 },
+	"venom_bug":   { "name": "毒虫", "hp": 55,  "atk": 11, "def": 1, "spd": 11, "row": "back", "ranged": true },
+	"stone_guard": { "name": "石卫", "hp": 120, "atk": 15, "def": 8, "spd": 6 },
+	"bandit":      { "name": "强盗", "hp": 100, "atk": 18, "def": 4, "spd": 10 },
+	"ranger":      { "name": "游侠", "hp": 75,  "atk": 16, "def": 2, "spd": 12, "row": "back", "ranged": true },
+	"demon_lord":  { "name": "魔王", "hp": 216, "atk": 19, "def": 11, "spd": 10 },
+	"claw_minion": { "name": "爪牙", "hp": 85,  "atk": 12, "def": 4, "spd": 9 },
 
 	# ── 实验场景用（前排蛮兵 + 后排巫师）──────────────────────────────────────
 	"brute":     { "name": "蛮兵",   "hp": 90, "atk": 15, "def": 6, "spd": 8, "ai": EnemyData.AI_AGGRESSIVE },

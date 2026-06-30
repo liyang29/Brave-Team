@@ -20,5 +20,5 @@ const HAS_TAUNT: bool = true
 func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatant:
 	return _target_highest_hp(opponents)
 
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = []) -> String:
+func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	return ""  # 坦克不使用技能，专注吸收伤害

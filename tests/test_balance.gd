@@ -159,6 +159,10 @@ func test_good_build_beats_bad_build() -> void:
 	var ok := _win_rate(_ok_grids())
 	var bad := _win_rate(_bad_grids())
 	gut.p("通关率  好build %d/%d  ·  中庸 %d/%d  ·  烂build %d/%d" % [good, TRIALS, ok, TRIALS, bad, TRIALS])
+	# 目标区间(中等)：好 build 稳赢、中庸有真实风险(~50%)、烂 build 必败。
+	# 这几条断言锁住区间——以后若英雄被买强/敌人变弱使"中庸稳通关"，会立刻红。
 	assert_gt(good, bad, "好 build 通关率应明显高于烂 build")
-	assert_gte(good, int(TRIALS * 0.5), "好 build 至少一半能通关（不是必死）")
-	assert_lte(bad, int(TRIALS * 0.5), "烂 build 多数过不去（build 要有意义）")
+	assert_gte(good, int(TRIALS * 0.7), "好 build 多数能通关（稳赢，留采样冗余）")
+	assert_lt(ok, good, "中庸 build 应弱于好 build（相邻协同有价值）")
+	assert_lte(ok, int(TRIALS * 0.75), "中庸 build 不应稳通关 —— 要有真实风险（锁住'确定性买强'漂移）")
+	assert_lte(bad, int(TRIALS * 0.2), "烂 build 应基本必败（build 要有意义）")

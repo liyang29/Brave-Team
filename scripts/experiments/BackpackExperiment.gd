@@ -23,11 +23,12 @@ const POOL_DEF: Dictionary = {
 	"staff": 1, "tome": 1, "holy_symbol": 1,
 	"amulet": 1, "charm": 1,
 	# 技能书（占格、和装备抢空间；认职业）
-	"book_slash": 1, "book_cleave": 1,
+	"book_slash": 1, "book_cleave": 1, "book_taunt": 1,
 	"book_fireball": 1, "book_icelance": 1,
 	"book_heal": 1, "book_purify": 1,
-	# 副属性物品（暴击）
+	# 副属性物品（暴击 / 闪避 / 嘲讽）
 	"crit_gem": 1, "keen_edge": 1, "berserk_ring": 1,
+	"evasion_cloak": 1, "shadow_mantle": 1, "provoke_charm": 1, "decoy_mask": 1,
 }
 
 var _heroes: Array = []        # [{ hero, base:{}, grid:{}, name }]

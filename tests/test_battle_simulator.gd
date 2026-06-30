@@ -47,6 +47,11 @@ func _enemy(hp: int = 50, atk: int = 10, def_val: int = 0,
 ## 创建单英雄队伍（可手动覆盖基础属性）
 func _party(hp: int = 200, atk: int = 50, def_val: int = 10) -> Party:
 	var hero            = HeroFactory.create(Hero.HeroClass.WARRIOR)
+	# 清空 HeroFactory 注入的随机技能：对齐真实跑局（技能只来自背包书），
+	# 否则随机抽到 shield_bash 在确定性选技下会把敌人眩晕锁死，使结果测试随机不稳定。
+	var sk = hero.get("skills")
+	if sk != null:
+		sk.clear()
 	hero.base_max_hp    = hp
 	hero.current_hp     = hp
 	hero.base_attack    = atk

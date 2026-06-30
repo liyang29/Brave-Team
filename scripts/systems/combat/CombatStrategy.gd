@@ -1,5 +1,8 @@
 class_name CombatStrategy extends RefCounted
 
+# SkillTable 用 preload 引入（读 mp_cost 判断可放性），避免全局类缓存时序问题
+const SkillTableScript = preload("res://scripts/utils/SkillTable.gd")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # CombatStrategy — 战斗决策策略基类（Strategy 模式）
 #
@@ -35,8 +38,15 @@ func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatan
 #   allies  : 同队存活单位列表（用于牧师等支援职业判断友军状态）
 # 返回：技能 ID 字符串；空字符串 = 普通攻击
 # 默认行为：普通攻击（子类按概率 override 选择技能）
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = []) -> String:
+func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	return ""
+
+
+# should_cast：连招模型——英雄按摆放顺序逐个判断"这个就绪技能现在该不该放"。
+# 已知技能"可放"(不在 CD + 蓝够)，此处只判"条件"：纯伤害技默认 true(就绪即放)；
+# 治疗/嘲讽/净化等条件技由各职业 override（满血不空放治疗等）。
+func should_cast(_skill_id: String, _self_bc: BattleCombatant, _hero_ref, _allies: Array, _opponents: Array) -> bool:
+	return true
 
 
 # ── 共享工具方法（子类复用）────────────────────────────────────────────────────
@@ -92,14 +102,38 @@ func on_battle_event(_event: String, _self_bc: BattleCombatant, _context: Dictio
 	pass
 
 
-# 随机从技能列表中选一个（有概率）；概率未达到则返回空（普攻）
-# chance: 0.0~1.0，触发技能的概率
-func _pick_skill_by_chance(hero_ref, chance: float) -> String:
+# ── 技能可放性 & 选技（英雄：确定性 / 可放就放，蓝量+CD 当唯一节流阀）──────────
+# 设计原则：本作是构筑游戏，玩家唯一的杆是搭背包 → 战斗要"可读"：配了什么书，
+# 蓝够、转好就放什么，不再掷骰子。蓝量消耗 + 回合冷却本身就是天然节流。
+# （敌人 AI 保持各自的随机/特定逻辑——不可预测对"敌人"是优点。）
+
+## 单个技能现在能不能放（不在冷却 + 蓝量足够）
+func _is_castable(self_bc: BattleCombatant, skill_id: String) -> bool:
+	if self_bc.is_skill_on_cooldown(skill_id):
+		return false
+	var mp_cost: int = int(SkillTableScript.get_skill(skill_id).get("mp_cost", 0))
+	return self_bc.current_mp >= mp_cost
+
+## 英雄当前【可放】的技能子集（已学 + 不在冷却 + 蓝够）
+func _castable_skills(self_bc: BattleCombatant, hero_ref) -> Array:
 	if hero_ref == null:
-		return ""
+		return []
 	var skills = hero_ref.get("skills")
-	if skills == null or skills.is_empty():
-		return ""
-	if randf() > chance:
-		return ""
-	return skills[randi() % skills.size()]
+	if skills == null:
+		return []
+	return skills.filter(func(sid): return _is_castable(self_bc, sid))
+
+## 可放的【伤害】技能里 power 最高的一个（确定性"放最强可用攻击技"）；无 → 普攻("")。
+## 拉仇/buff/治疗等非伤害技由各职业策略按优先级单独处理，不进这里。
+func _strongest_castable_damage(self_bc: BattleCombatant, hero_ref) -> String:
+	var best := ""
+	var best_power := -1.0
+	for sid in _castable_skills(self_bc, hero_ref):
+		var s: Dictionary = SkillTableScript.get_skill(sid)
+		if s.get("type", "damage") != "damage":
+			continue
+		var p: float = float(s.get("power", 1.0))
+		if p > best_power:
+			best_power = p
+			best = sid
+	return best

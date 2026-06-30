@@ -96,10 +96,17 @@ var extra_stats: Dictionary = {}
 func get_stat(key: String, default: float = 0.0) -> float:
 	return float(extra_stats.get(key, default))
 
-## 是否带嘲讽（副属性 taunt>0）→ 敌人优先攻击本单位（吸火力保后排）。
-## 与 CombatStrategy.HAS_TAUNT 并列，由 BattleSimulator._find_taunt_target 判定。
+## 是否带嘲讽 → 敌人优先攻击本单位（吸火力保后排）。两种来源：
+##   ① 常驻副属性 taunt>0（物品：挑衅护符/诱敌面具）
+##   ② 临时嘲讽效果（主动技能"挑衅怒吼"施放，active_effects 里的 taunt，按回合到期）
+## 与 CombatStrategy.HAS_TAUNT 并列，由 BattleSimulator._find_taunt_target 判定（仅前排生效）。
 func has_taunt() -> bool:
-	return get_stat("taunt", 0.0) > 0.0
+	if get_stat("taunt", 0.0) > 0.0:
+		return true
+	for eff in active_effects:
+		if eff.get("type") == "taunt" and eff.get("turns", 0) > 0:
+			return true
+	return false
 
 
 # ── 工厂方法 ──────────────────────────────────────────────────────────────────
@@ -276,6 +283,16 @@ func apply_shield(amount: int) -> void:
 	active_effects.append({ "type": "shield", "amount": amount })
 
 
+## apply_taunt：施加临时嘲讽（主动技能用；不叠加，取较大 turns 刷新）
+## 计时由 tick_effects() 递减，到期解除。has_taunt() 会读它。
+func apply_taunt(turns: int) -> void:
+	for eff in active_effects:
+		if eff.get("type") == "taunt":
+			eff["turns"] = max(eff["turns"], turns)
+			return
+	active_effects.append({ "type": "taunt", "turns": turns })
+
+
 # ── 蓝量 ──────────────────────────────────────────────────────────────────────
 
 ## 消耗蓝量，返回实际消耗量（蓝量不足时返回 -1）
@@ -364,6 +381,12 @@ func tick_effects() -> void:
 					speed += eff.get("amount", 0)   # 还原速度
 				else:
 					next_effects.append(eff)
+
+			"taunt":
+				eff["turns"] -= 1
+				if eff["turns"] > 0:
+					next_effects.append(eff)
+				# turns == 0：临时嘲讽解除，不再 append
 
 			"buff":
 				if eff.get("turns") == -1:

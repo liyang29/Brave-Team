@@ -85,7 +85,8 @@ func test_pure_melee_mostly_loses() -> void:
 	var r := _run([_w("战士甲"), _w("战士乙")])
 	gut.p("① 纯两战士：胜率 %d/%d，术士被点掉 %d/%d" % [r.wins, TRIALS, r.caster_kills, TRIALS])
 	assert_lt(r.wins, TRIALS / 2, "纯近战够不到后排术士，应大概率团灭")
-	assert_eq(r.caster_kills, 0, "纯近战永远点不掉后排术士")
+	# 注：连招买强后近战偶尔能凿穿前排、清空后够到后排术士；但仍是少数（机制：有前排掩护时够不到）。
+	assert_lt(r.caster_kills, TRIALS / 2, "纯近战极少能点掉后排术士（前排没清空就够不到）")
 
 
 func test_with_mage_mostly_wins() -> void:

@@ -26,6 +26,11 @@ class_name SkillTable
 #   "damage"     — 造成伤害（可附加 DoT/眩晕/减速）
 #   "buff_self"  — 强化自身属性（无目标，不造成伤害）
 #   "heal_ally"  — 治疗血量最少的友军（power × magic = 回血量）
+#   "cleanse"    — 移除全体友军 DoT（解毒）
+#   "taunt_self" — 主动嘲讽：临时拉仇 taunt_turns 回合（可带 buff_defense 立防）；仅前排生效
+#
+# taunt_self 专属字段：
+#   taunt_turns : int — 临时嘲讽持续回合数
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -69,6 +74,16 @@ const SKILLS: Dictionary = {
 		"power":      0.9,  # 0.9←1.2：AOE不拆分后总伤过高，折减到与单体持平
 		"use_magic":  false,
 		"aoe":        true,
+	},
+
+	"taunt_roar": {
+		"hero_class":   "warrior",
+		"name_zh":      "挑衅怒吼",
+		"type":         "taunt_self",   # 临时拉仇（仅前排生效）+ 立防
+		"mp_cost":      15,
+		"taunt_turns":  2,              # 嘲讽持续 2 回合
+		"buff_defense": 4,              # 拉仇同时立起防御，名副其实"我顶上来挡"
+		"buff_turns":   2,              # 防御与嘲讽同步时长
 	},
 
 	# ── 法师 ──────────────────────────────────────────────────────────────────

@@ -77,53 +77,31 @@ static func simulate(party, enemy_data_list: Array) -> BattleResult:
 			if opponents.is_empty():
 				break
 
-			# 站位触及：
-			#   soft_row：近战(非 can_reach_back)只能打对方前排；远程可打任何人（世界树式）。
-			#             伤害仍按 _row_damage_mult 修正。
-			#   reach   ：逐列掩护（其它实验用）。
-			var reachable: Array
-			if pos_mode == "soft_row":
-				reachable = _soft_reachable(unit, opponents)
-			else:
-				reachable = _get_reachable_opponents(unit, opponents)
-
-			var taunt_target = _find_taunt_target(reachable)
-
-			# 选目标
-			var target: BattleCombatant
-			if taunt_target != null:
-				target = taunt_target
-			else:
-				target = unit.combat_strategy.choose_target(unit, reachable)
-
-			# 选技能
 			var hero_ref = unit._hero_ref if unit.is_hero() else null
-			var allies: Array = _get_allies(unit, hero_bcs, enemy_bcs)
-			var skill_id: String
-			if unit.is_hero() and hero_ref != null and \
-			   hero_ref.hero_class == Hero.HeroClass.ROGUE and \
-			   target.get_hp_percent() < 0.3 and \
-			   unit.combat_strategy is RogueStrategy:
-				skill_id = unit.combat_strategy.choose_skill_finisher(hero_ref)
+
+			if unit.is_hero() and hero_ref != null:
+				# 英雄：按背包摆放顺序，把所有"就绪+条件满足"的技能依次放掉（连招，替代普攻）
+				_hero_combo_turn(unit, hero_ref, hero_bcs, enemy_bcs, pos_mode, turn_logs)
 			else:
-				skill_id = unit.combat_strategy.choose_skill(unit, hero_ref, allies)
-
-			# ── 冷却 + 蓝量检查：在冷却中或蓝量不足则退化为普攻 ──────────────
-			if not skill_id.is_empty():
-				var skill_data: Dictionary = SkillTableScript.get_skill(skill_id)
-				var mp_cost: int = skill_data.get("mp_cost", 0)
-				if unit.is_skill_on_cooldown(skill_id):
-					skill_id = ""   # 冷却中，改用普攻
-				elif unit.current_mp < mp_cost:
-					skill_id = ""   # 蓝量不足，改用普攻
-
-			# 确认要施放技能 → 触发其回合冷却
-			if not skill_id.is_empty():
-				unit.trigger_skill_cooldown(skill_id)
-
-			# 执行技能或普攻（AOE 命中范围受触及/形状限制；shaped AOE 用完整对手列表）
-			var logs: Array = _execute_action(unit, skill_id, target, reachable, allies, opponents, pos_mode)
-			turn_logs.append_array(logs)
+				# 敌人：单动作 AI（选目标 → 选一个技能/普攻），保持原有行为
+				var reachable: Array
+				if pos_mode == "soft_row":
+					reachable = _soft_reachable(unit, opponents)
+				else:
+					reachable = _get_reachable_opponents(unit, opponents)
+				var taunt_target = _find_taunt_target(reachable)
+				var target: BattleCombatant = taunt_target if taunt_target != null \
+					else unit.combat_strategy.choose_target(unit, reachable)
+				var allies: Array = _get_allies(unit, hero_bcs, enemy_bcs)
+				var skill_id: String = unit.combat_strategy.choose_skill(unit, hero_ref, allies, opponents)
+				if not skill_id.is_empty():
+					if unit.is_skill_on_cooldown(skill_id) \
+						or unit.current_mp < int(SkillTableScript.get_skill(skill_id).get("mp_cost", 0)):
+						skill_id = ""   # 冷却中/蓝量不足 → 普攻
+				if not skill_id.is_empty():
+					unit.trigger_skill_cooldown(skill_id)
+				var logs: Array = _execute_action(unit, skill_id, target, reachable, allies, opponents, pos_mode)
+				turn_logs.append_array(logs)
 
 			# 行动后检查消耗品（英雄专属）
 			if unit.is_hero():
@@ -154,7 +132,7 @@ static func _basic_attack(actor: BattleCombatant, target: BattleCombatant, pos_m
 		return logs   # 完全免伤：不结算伤害、不触发装备/击杀
 	var crit_mult := _roll_crit(actor)
 	var row_mult := _row_damage_mult(actor, target, true, pos_mode)   # 普攻为物理，受站位修正
-	var dmg := target.take_damage(int(round(actor.attack * crit_mult * row_mult)))
+	var dmg := target.take_damage(int(round(actor.attack * crit_mult * row_mult * _roll_variance())))
 	var atk_log := TurnLog.attack(actor.source_name, target.source_name, dmg, not target.is_alive())
 	atk_log.is_crit = crit_mult > 1.0
 	logs.append(atk_log)
@@ -165,6 +143,51 @@ static func _basic_attack(actor: BattleCombatant, target: BattleCombatant, pos_m
 		_process_equipment_triggers("on_kill", actor, target, dmg, logs)
 		_notify_battle_event("on_kill", actor, { "target": target, "damage": dmg })
 	return logs
+
+
+# ── 英雄连招回合（中间档：按摆放顺序连放所有就绪技能）────────────────────────
+# hero_ref.skills 已按"读序"排好（BackpackModel.compute 排序）。
+# 逐个技能：可放(不在CD+蓝够) + 条件满足(should_cast) → 触发CD + 释放；放完重取战场。
+# 放了任一技能就不再普攻；一个都没放 → 退化为一次普攻。
+static func _hero_combo_turn(unit, hero_ref, hero_bcs: Array, enemy_bcs: Array, pos_mode: String, turn_logs: Array) -> void:
+	var skills: Array = hero_ref.get("skills") if hero_ref.get("skills") else []
+	var fired: bool = false
+	for skill_id in skills:
+		var opponents: Array = _get_opponents(unit, hero_bcs, enemy_bcs)
+		if opponents.is_empty():
+			break
+		if not _is_skill_ready(unit, skill_id):
+			continue   # 冷却中 / 蓝量不足
+		var allies: Array = _get_allies(unit, hero_bcs, enemy_bcs)
+		if not unit.combat_strategy.should_cast(skill_id, unit, hero_ref, allies, opponents):
+			continue   # 条件未满足（如满血不放治疗）
+		var reachable: Array = _soft_reachable(unit, opponents) if pos_mode == "soft_row" \
+			else _get_reachable_opponents(unit, opponents)
+		var taunt_target = _find_taunt_target(reachable)
+		var target: BattleCombatant = taunt_target if taunt_target != null \
+			else unit.combat_strategy.choose_target(unit, reachable)
+		unit.trigger_skill_cooldown(skill_id)
+		turn_logs.append_array(_execute_action(unit, skill_id, target, reachable, allies, opponents, pos_mode))
+		fired = true
+
+	if fired:
+		return   # 技能替代普攻
+	# 一个技能都没放 → 普攻
+	var opp: Array = _get_opponents(unit, hero_bcs, enemy_bcs)
+	if opp.is_empty():
+		return
+	var reach: Array = _soft_reachable(unit, opp) if pos_mode == "soft_row" \
+		else _get_reachable_opponents(unit, opp)
+	var tt = _find_taunt_target(reach)
+	var tgt: BattleCombatant = tt if tt != null else unit.combat_strategy.choose_target(unit, reach)
+	turn_logs.append_array(_execute_action(unit, "", tgt, reach, _get_allies(unit, hero_bcs, enemy_bcs), opp, pos_mode))
+
+
+# 技能是否就绪：不在冷却 + 蓝量足够（连招/单动作共用判断）。
+static func _is_skill_ready(unit, skill_id: String) -> bool:
+	if unit.is_skill_on_cooldown(skill_id):
+		return false
+	return unit.current_mp >= int(SkillTableScript.get_skill(skill_id).get("mp_cost", 0))
 
 
 static func _execute_action(
@@ -229,6 +252,17 @@ static func _execute_action(
 		logs.append(log)
 		return logs
 
+	# ── 主动嘲讽（taunt_self）：临时拉仇 N 回合（仅前排生效）+ 可立防 ─────────────
+	# "我站出来挡"：施放后 has_taunt() 为真，敌人优先打我；前排门槛在 _find_taunt_target。
+	if stype == "taunt_self":
+		var taunt_turns: int = skill.get("taunt_turns", 2)
+		actor.apply_taunt(taunt_turns)
+		if skill.get("buff_defense", 0) != 0:
+			actor.apply_buff("defense", skill.get("buff_defense"), skill.get("buff_turns", taunt_turns))
+		var log := TurnLog.skill_attack(actor.source_name, actor.source_name, skill_id, 0, false)
+		logs.append(log)
+		return logs
+
 	# ── 强化自身 ──────────────────────────────────────────────────────────────
 	# 通过 apply_buff() 写入 active_effects，支持计时过期和属性还原
 	# buff_turns: -1 = 战斗全程；>0 = 持续 N 次 tick_effects() 后自动还原
@@ -265,7 +299,7 @@ static func _execute_action(
 				logs.append(_make_dodge_log(opp))
 				continue
 			var dmg:        int = _calc_damage(raw_aoe, opp, ignore_def, half_def)
-			dmg = int(round(dmg * _row_damage_mult(actor, opp, not use_magic, pos_mode)))   # 站位修正（仅物理）
+			dmg = int(round(dmg * _row_damage_mult(actor, opp, not use_magic, pos_mode) * _roll_variance()))   # 站位修正（仅物理）+ 伤害浮动
 			var actual_dmg: int = opp.take_damage_raw(dmg)   # 护盾吸收后的实际伤害
 			var aoe_log := TurnLog.skill_attack(
 				actor.source_name, opp.source_name, skill_id, actual_dmg, not opp.is_alive()
@@ -284,7 +318,7 @@ static func _execute_action(
 		var crit_mult:  float = _roll_crit(actor)
 		var raw_atk:    int = int(float(base_atk) * power * crit_mult)
 		var row_mult:   float = _row_damage_mult(actor, target, not use_magic, pos_mode)   # 站位修正（仅物理）
-		var dmg:        int = int(round(_calc_damage(raw_atk, target, ignore_def, half_def) * row_mult))
+		var dmg:        int = int(round(_calc_damage(raw_atk, target, ignore_def, half_def) * row_mult * _roll_variance()))
 		var actual_dmg: int = target.take_damage_raw(dmg)   # 护盾吸收后的实际伤害
 		var log := TurnLog.skill_attack(
 			actor.source_name, target.source_name, skill_id, actual_dmg, not target.is_alive()
@@ -348,6 +382,16 @@ static func _make_dodge_log(target: BattleCombatant) -> TurnLog:
 	var log := TurnLog.attack(target.source_name, target.source_name, 0)
 	log.skill_id = "dodge"
 	return log
+
+
+# ── 伤害浮动（±DMG_VARIANCE）────────────────────────────────────────────────
+# 给每次伤害落地乘一个 [1-v, 1+v] 的小随机，AI 出招仍确定可读，但战斗结果不再
+# "分毫不差"——恢复胜率梯度（否则确定性战斗下胜率非 0 即 100，难度无法细调），
+# 手感也更自然。普攻/单体技能/AOE 三处统一调用。
+const DMG_VARIANCE: float = 0.10
+
+static func _roll_variance() -> float:
+	return randf_range(1.0 - DMG_VARIANCE, 1.0 + DMG_VARIANCE)
 
 
 # ── 软站位伤害修正（方案 B / 世界树式，仅 soft_row 模式 + 仅物理伤害）──────────

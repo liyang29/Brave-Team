@@ -162,6 +162,17 @@ static func aura_text(aura: Dictionary) -> String:
 			parts.append("%s+%d" % [_STAT_ZH[k], int(aura[k])])
 	return "%s %s" % [scope, " ".join(parts)]
 
+## 光环范围说明（tooltip 用）——按 scope 说清"加给谁、含不含自己"。
+## team/adjacent/same_row 必含持有者本人；front_row/back_row 是绝对排，只在持有者站那排时才含自己。
+static func aura_scope_note(scope: String) -> String:
+	match scope:
+		"team":      return "全队都加（含自己）"
+		"adjacent":  return "自己 + 正交相邻格的队友"
+		"same_row":  return "持有者所在那一排（含自己）"
+		"front_row": return "所有站前排的人（持有者站前排才含自己）"
+		"back_row":  return "所有站后排的人（持有者站后排才含自己）"
+	return "范围内队友"
+
 ## 物品简短属性描述（UI 用）
 static func item_desc(item_id: String) -> String:
 	var it: Dictionary = ITEMS.get(item_id, {})
@@ -223,7 +234,8 @@ static func item_tooltip(item_id: String) -> String:
 	if hint != "":
 		lines.append("协同：" + hint)
 	if it.has("aura"):
-		lines.append("光环：" + aura_text(it["aura"]) + "（含自己 + 范围内队友，按站位）")
+		lines.append("光环：" + aura_text(it["aura"]))
+		lines.append("范围：" + aura_scope_note(it["aura"].get("scope", "team")))
 	return "\n".join(lines)
 
 

@@ -271,6 +271,17 @@ func test_warrior_cleave_when_multiple_enemies() -> void:
 	assert_eq(strat.choose_skill(w, hero, [], [e1]), "slash", "单敌 → 斩击")
 
 
+func test_aura_scope_note_self_inclusion() -> void:
+	# team/同排 必含自己；绝对前/后排 是"持有者站那排才含自己"（修 tooltip 误导）
+	assert_true(Backpack.aura_scope_note("team").contains("含自己"), "team 必含自己")
+	assert_true(Backpack.aura_scope_note("same_row").contains("含自己"), "同排必含自己")
+	assert_true(Backpack.aura_scope_note("back_row").contains("才含自己"), "后排=条件含自己")
+	assert_true(Backpack.aura_scope_note("front_row").contains("才含自己"), "前排=条件含自己")
+	# 守护图腾(back_row) tooltip 应标清"给后排 + 条件含自己"，不再无条件"含自己"
+	var tip := Backpack.item_tooltip("ward_totem")
+	assert_true(tip.contains("后排") and tip.contains("才含自己"), "守护图腾 tooltip 不再误导")
+
+
 func test_books_sorted_by_reading_order() -> void:
 	# 技能书按"读序"(上→下，每行左→右)排列 → 决定连招释放顺序
 	var grid := {

@@ -69,7 +69,7 @@ func _ready() -> void:
 	_leave_btn.custom_minimum_size = Vector2(200, 44)
 	_leave_btn.add_theme_font_size_override("font_size", 20)
 	_leave_btn.pressed.connect(func():
-		if RunManager.roster.is_empty():
+		if not RunManager.can_leave_village():
 			return
 		RunManager.leave_village()
 		get_tree().change_scene_to_file(SCENE_MAP))
@@ -90,10 +90,10 @@ func _refresh() -> void:
 	_refresh_party()
 	_refresh_recruit()
 	_refresh_shop()
-	# 必须至少招 1 人才能出发
-	var empty: bool = RunManager.roster.is_empty()
-	_leave_btn.text = "先招募至少 1 人" if empty else "出发 ▶"
-	_leave_btn.disabled = empty
+	# 至少招满最小人数才能出发（1 人打不过第一关）
+	var can_leave: bool = RunManager.can_leave_village()
+	_leave_btn.text = "出发 ▶" if can_leave else "先招募至少 %d 人" % RunManager.MIN_PARTY_TO_LEAVE
+	_leave_btn.disabled = not can_leave
 
 
 func _refresh_party() -> void:

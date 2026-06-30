@@ -31,7 +31,7 @@
 - [x] **闭环跑通**：标题→地图→遭遇→回地图→魔王（通关/全灭）；HP 跨节点保留(消耗战)
 - [x] **把背包构筑接成"遭遇前 prep 界面"**（Step 1-3 完成）：`BackpackLoadout`(背包→Party 翻译，幂等+钳血) + RunManager 名册/库存/站位状态 + 共享 `BackpackPrepPanel`，已接进 Encounter——"开始冒险"开战前可搭背包/摆站位。**编辑改为拖放**（`DragSlot` 原生拖放：库存↔背包↔背包互拖、站位互拖；公共装备栏=带数量角标的格子）。（详见 `docs/TODO_BACKPACK_PREP.md`）
 - [x] **战利品 draft（Step 4 完成）**：胜利后三选二掉落（rarity 加权，`LootTable`+`Draft` 场景），留下进库存；魔王胜直接通关。已删 debug 起手种子（库存空、纯靠掉落）。
-- [x] **村庄（节点类型 `village`＝商店＋招募＋队伍列表，一屏）**：起步金币 500；商店按 rarity 上货 6 件(50/120/250 只买不卖) + 招募(3 候选/120 金/人) + 我的队伍列表（`VillageScreen`+`Village` 场景，RunManager `VILLAGE` 状态/`buy_item`/`recruit`/`leave_village`）。**起手空队**，须在村庄招 ≥1 人才能出发；去掉"必须摆装备才能开战"限制。
+- [x] **村庄（节点类型 `village`＝商店＋招募＋队伍列表，一屏）**：起步金币 500；商店按 rarity 上货 6 件(50/120/250 只买不卖) + 招募(3 候选/120 金/人) + 我的队伍列表（`VillageScreen`+`Village` 场景，RunManager `VILLAGE` 状态/`buy_item`/`recruit`/`leave_village`）。**起手空队**，须在村庄招 **≥2 人**才能出发（`MIN_PARTY_TO_LEAVE`；harness 实测 1 人裸队打第一关 0/20、2 人 20/20——1 人是送死陷阱，已堵；含"招不动了放行"防卡死）；去掉"必须摆装备才能开战"限制。
 - [x] **英雄池**：`HERO_TEMPLATES`（5 职业含盗贼/猎人，加英雄=加一行）；`STARTER_TEAM` 空（全靠招募）。
 - [x] **降 base + 平衡（Step 5）**：裸 base 降到实验低值（战力靠背包）；`test_balance` harness 量化通关率，调到中等难度（好build稳赢 / 中庸有风险 / 烂build必败，魔王是协同门槛）。
 - [x] **英雄选技改确定性 + 伤害浮动 + 重平衡**：英雄"可放就放"(蓝量/CD 节流，build 可读)，敌人 AI 保持随机；战斗加 ±10% 伤害浮动(确定性下胜率本是 0/100 → 浮动恢复梯度)；据此重调敌人数值(`MonsterFactory`)，harness 锁回 好 20/20 · 中庸 ~10/20 · 烂 0/20，并加断言锁住"中庸不稳通关"。**遗留**：好 build 仍 ~100%(英雄强于中庸差距大，纯数值下"好build也冒汗"需 Boss 机制 AOE/援军，非本轮)。

@@ -33,6 +33,23 @@ func _ok_grids() -> Array:
 		{ Vector2i(0,0): "amulet", Vector2i(2,0): "book_heal" },
 	]
 
+# 真实"500 金开局"：招 3 人(360 金) + 剩 ~140 金只够 2~3 件普通货，无协同、火球书(稀有)买不起。
+# 模拟一个"会买但很穷"的开局：战士铁剑+斩击书、牧师治疗书、法师裸上(靠魔法普攻)。
+func _opening_grids() -> Array:
+	return [
+		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "book_slash" },  # 战士：攻+6 + 斩击(common×2=100)
+		{},                                                            # 法师：开局买不起火球书 → 魔法普攻
+		{ Vector2i(0,0): "book_heal" },                                # 牧师：治疗书(common 50)
+	]
+
+# 更穷的"裸开局"：招 3 人，没买到/买不起任何技能书 → 全员只会普攻（运气差/新手最可能的开局）。
+func _opening_naked() -> Array:
+	return [
+		{ Vector2i(0,0): "iron_sword" },   # 战士：只有把剑(攻+6)
+		{ Vector2i(0,0): "tome" },         # 法师：魔典(魔+4)，无火球书 → 魔法普攻
+		{ Vector2i(0,0): "amulet" },       # 牧师：护符(血+12)，无治疗书 → 普攻
+	]
+
 # 烂 build：放错人、无协同、无对职业技能书
 func _bad_grids() -> Array:
 	return [
@@ -71,14 +88,16 @@ func _node_winrate(grids: Array, enemies: Array) -> int:
 func test_per_node_health_report() -> void:
 	RunManager.start_run()
 	gut.p("===== 逐关体检（每关满血单独打 %d 次）=====" % TRIALS)
-	gut.p("关卡            好build   中庸build")
+	gut.p("关卡            好build  中庸  500金开局(会买)  裸开局(无技能书)")
 	for node in RunManager.nodes:
 		var enemies: Array = node.get("enemies", [])
 		if enemies.is_empty():
 			continue
 		var g := _node_winrate(_good_grids(), enemies)
 		var o := _node_winrate(_ok_grids(), enemies)
-		gut.p("%-12s    %d/%d      %d/%d" % [node.get("name", "?"), g, TRIALS, o, TRIALS])
+		var op := _node_winrate(_opening_grids(), enemies)
+		var nk := _node_winrate(_opening_naked(), enemies)
+		gut.p("%-12s   %d/%d   %d/%d   %d/%d   %d/%d" % [node.get("name", "?"), g, TRIALS, o, TRIALS, op, TRIALS, nk, TRIALS])
 	# 阵亡分布：整局中庸 build 在哪一关倒下（消耗战难度真正的落点）
 	gut.p("--- 中庸 build 整局阵亡分布（%d 局）---" % TRIALS)
 	var dist: Dictionary = {}
@@ -152,6 +171,34 @@ func _win_rate(grids: Array) -> int:
 		if _run_once(grids):
 			wins += 1
 	return wins
+
+
+# 任意人数/配置的队伍打一组敌人的满血胜率（第一个英雄前排，其余后排）。
+func _winrate_custom(hero_ids: Array, grids: Array, enemies: Array) -> int:
+	var wins := 0
+	for t in range(TRIALS):
+		var loadouts: Array = []
+		for i in range(hero_ids.size()):
+			var e: Dictionary = RunManager.make_hero_entry(hero_ids[i])
+			e["grid"] = grids[i].duplicate()
+			loadouts.append(e)
+		var slots: Dictionary = { Vector2i(0, 0): loadouts[0]["hero"] }
+		for i in range(1, loadouts.size()):
+			slots[Vector2i(i - 1, 1)] = loadouts[i]["hero"]
+		var party: Party = Loadout.build_party(loadouts, slots, true)
+		if BattleSimulator.simulate(party, enemies).party_won:
+			wins += 1
+	return wins
+
+# 第一关(林间遭遇 野狼×2)对"招几个人"的开局：找出能过第一关的最少人数
+func test_first_node_by_party_size() -> void:
+	var wolves: Array = MonsterFactory.create_group(["wolf", "wolf"])
+	var w1 := _winrate_custom(["warrior"], [{Vector2i(0,0):"iron_sword"}], wolves)
+	var w2 := _winrate_custom(["warrior", "priest"], [{Vector2i(0,0):"iron_sword"}, {Vector2i(0,0):"amulet"}], wolves)
+	var w3 := _winrate_custom(["warrior", "mage", "priest"],
+		[{Vector2i(0,0):"iron_sword"}, {Vector2i(0,0):"tome"}, {Vector2i(0,0):"amulet"}], wolves)
+	gut.p("第一关(野狼×2)裸队胜率：1人 %d/%d · 2人 %d/%d · 3人 %d/%d" % [w1, TRIALS, w2, TRIALS, w3, TRIALS])
+	assert_true(true, "看 gut.p：第一关对小队人数的门槛")
 
 
 func test_good_build_beats_bad_build() -> void:

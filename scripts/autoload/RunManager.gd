@@ -26,6 +26,7 @@ const REST_HEAL_PCT := 0.5   # 泉水/休息点：全员回复最大血的比例
 const MAX_PARTY := 5         # 队伍上限（起手 3，酒馆最多招到 5）
 const TAVERN_OFFERS := 3     # 酒馆每次上几个候选
 const RECRUIT_COST := 120    # 招募一个英雄的金币价（和买装备抢钱）
+const MIN_PARTY_TO_LEAVE := 2  # 至少 2 人才能出发（1 人打不过第一关；本作是小队游戏）
 
 # 英雄池：跑局可用的英雄模板（加英雄/调数值=加一行；盗贼/猎人已纳入）。
 # base = 低裸属性（战力靠背包）；技能在背包书注入，故此处不配技能。
@@ -176,6 +177,15 @@ func recruit(template_id: String) -> bool:
 	party.append(entry["hero"])
 	_place_in_empty_slot(entry["hero"])
 	return true
+
+## 能否离开村庄出发：达到最小人数（≥2）；或已≥1人但实在招不动了（没钱/没候选）→ 放行，避免卡死。
+func can_leave_village() -> bool:
+	if roster.size() >= MIN_PARTY_TO_LEAVE:
+		return true
+	if roster.size() >= 1 and (gold < RECRUIT_COST or tavern_offers.is_empty()):
+		return true
+	return false
+
 
 ## 离开村庄 → 前进到下一节点（商店+招募都在村庄；村庄不会是最后一个节点）。
 func leave_village() -> void:

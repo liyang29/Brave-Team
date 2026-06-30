@@ -167,6 +167,24 @@ func test_buy_fails_without_gold() -> void:
 	RunManager.gold = 0
 	assert_false(RunManager.buy_item(RunManager.shop_stock[0]), "没钱 → 买失败")
 
+func test_can_leave_village_requires_min_party() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	RunManager.gold = 1000
+	assert_false(RunManager.can_leave_village(), "0 人不能出发")
+	RunManager.recruit(RunManager.tavern_offers[0])
+	assert_false(RunManager.can_leave_village(), "1 人(还招得起)不能出发——避免 1 人送死第一关")
+	RunManager.recruit(RunManager.tavern_offers[0])
+	assert_true(RunManager.can_leave_village(), "招满 2 人 → 可出发")
+
+func test_can_leave_village_escape_when_cannot_recruit() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	RunManager.gold = 1000
+	RunManager.recruit(RunManager.tavern_offers[0])   # 1 人
+	RunManager.gold = 0                                # 招不动了
+	assert_true(RunManager.can_leave_village(), "1 人但没钱再招 → 放行，避免卡死")
+
 func test_leave_village_advances() -> void:
 	RunManager.start_run()
 	RunManager.enter_current_node()

@@ -38,6 +38,22 @@ func _good_grids() -> Array:
 		  Vector2i(0,1): "amulet", Vector2i(1,1): "charm" },
 	]
 
+# 多书连招 build：好 build 的地基上，把每个职业"第 2 本攻击书"也堆给同一人
+#   —— 战士 斩击(cd1)+横扫(cd2 AOE)、法师 火球(cd2)+冰枪(cd1)，法师加法力护符续蓝。
+# 目的：量"堆多本书一回合连放"到底比"每人 1 本"强多少（连招机制没上限，只受 CD/蓝/条件限）。
+func _combo_grids() -> Array:
+	return [
+		# 战士：开刃 + 重装 + 斩击书 + 横扫书（一回合 slash→cleave，MP40 放完即空 → 首回合爆发）
+		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "book_slash",
+		  Vector2i(0,1): "shield", Vector2i(1,1): "chainmail", Vector2i(2,1): "book_cleave" },
+		# 法师：共鸣 + 火球书 + 冰枪书 + 法力护符（+30蓝续航；一回合 fireball→ice_lance）
+		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome", Vector2i(2,0): "book_fireball",
+		  Vector2i(0,1): "mana_charm", Vector2i(1,1): "book_icelance" },
+		# 牧师：生机 + 治疗书 + 净化书（牧师无第 2 攻击书 → 仍是辅助，非连招 carry）
+		{ Vector2i(0,0): "holy_symbol", Vector2i(2,0): "book_heal",
+		  Vector2i(0,1): "amulet", Vector2i(1,1): "charm", Vector2i(2,1): "book_purify" },
+	]
+
 # 中庸 build：放对人、有装备有技能书，但没凑相邻协同（衡量"协同到底多关键"）
 func _ok_grids() -> Array:
 	return [
@@ -210,6 +226,54 @@ func test_first_node_by_party_size() -> void:
 		[{Vector2i(0,0):"iron_sword"}, {Vector2i(0,0):"tome"}, {Vector2i(0,0):"amulet"}], wolves)
 	gut.p("第一关(野狼×2)裸队胜率：1人 %d/%d · 2人 %d/%d · 3人 %d/%d" % [w1, TRIALS, w2, TRIALS, w3, TRIALS])
 	assert_true(true, "看 gut.p：第一关对小队人数的门槛")
+
+
+# ── 多书连招压测（潜伏平衡风险）─────────────────────────────────────────────
+# 问题：现有平衡按"每人 1 本书"调；但连招机制允许一回合放完背包里所有就绪技能。
+# 这里量"多书连招队"vs"单书好队"的通关率差，判断堆书是否打穿已调好的难度。
+func test_multibook_combo_pressure() -> void:
+	var good := _win_rate(_good_grids())
+	var combo := _win_rate(_combo_grids())
+	gut.p("===== 多书连招压测 =====")
+	gut.p("整局通关率：单书好队 %d/%d  ·  多书连招队 %d/%d" % [good, TRIALS, combo, TRIALS])
+	# 逐关（每关满血单独打）对比，看连招在哪拉开差距、魔王关是否被打穿
+	gut.p("逐关满血胜率（单书 → 多书）：")
+	for node in _balance_nodes():
+		var enemies: Array = node.get("enemies", [])
+		if enemies.is_empty():
+			continue
+		var g := _node_winrate(_good_grids(), enemies)
+		var c := _node_winrate(_combo_grids(), enemies)
+		gut.p("  %-12s  %d/%d → %d/%d%s" % [
+			node.get("name", "?"), g, TRIALS, c, TRIALS,
+			"   ← 魔王" if node.get("type") == "boss" else ""])
+	# 胜率饱和（都 100%）时用更灵敏的尺子：魔王战平均回合数 + 打完剩余血量%
+	# —— 更快清场 / 剩更多血 = 更强，能看出"多书比单书强多少量级"。
+	var gs := _boss_sharpness(_good_grids())
+	var cs := _boss_sharpness(_combo_grids())
+	gut.p("魔王战锐度（满血单打 %d 次）：" % TRIALS)
+	gut.p("  单书好队：平均 %.1f 回合，打完剩血 %.0f%%" % [gs["turns"], gs["hp_pct"] * 100])
+	gut.p("  多书连招：平均 %.1f 回合，打完剩血 %.0f%%" % [cs["turns"], cs["hp_pct"] * 100])
+	# 软断言：多书不应弱于单书（连招是正向收益）；具体是否 OP 看上面数据人工判断。
+	assert_gte(combo, good, "多书连招不应弱于单书好队（连招应是正收益）")
+
+# 魔王战锐度：满血单打 TRIALS 次，返回平均回合数 + 平均打完剩余血量比例。
+func _boss_sharpness(grids: Array) -> Dictionary:
+	var boss: Array = MonsterFactory.create_group(["demon_lord", "claw_minion"])
+	var turns_sum := 0
+	var hp_frac_sum := 0.0
+	for t in range(TRIALS):
+		var tm: Dictionary = _team(grids)
+		var party: Party = Loadout.build_party(tm["loadouts"], tm["slots"], true)
+		var res: BattleResult = BattleSimulator.simulate(party, boss)
+		turns_sum += res.total_turns
+		var hp := 0
+		var mx := 0
+		for e in tm["loadouts"]:
+			hp += max(0, e["hero"].current_hp)
+			mx += e["hero"].get_max_hp()
+		hp_frac_sum += (float(hp) / float(mx)) if mx > 0 else 0.0
+	return { "turns": float(turns_sum) / TRIALS, "hp_pct": hp_frac_sum / TRIALS }
 
 
 func test_good_build_beats_bad_build() -> void:

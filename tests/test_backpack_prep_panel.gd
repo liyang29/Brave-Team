@@ -78,16 +78,37 @@ func test_drag_bag_back_to_pool() -> void:
 	assert_eq(int(owned.get("iron_sword", 0)), 1, "退回库存 +1")
 
 
-func test_drag_bag_to_occupied_swaps() -> void:
+func test_drag_bag_onto_overlap_rejected() -> void:
+	# 形状感知：拖到会与别件重叠的落点 → 拒绝（不交换），双方原地不动
 	var e := _warrior_entry()
 	var owned := { "iron_sword": 1, "shield": 1 }
 	var p = _make_panel([e], owned, { Vector2i(0,0): e["hero"] })
-	p.handle_drop("bag", _bag_key(0, Vector2i(0,0)), p.grab_payload("pool", "iron_sword"))
-	p.handle_drop("bag", _bag_key(0, Vector2i(1,0)), p.grab_payload("pool", "shield"))
-	# 把 (0,0) 的剑拖到 (1,0) 的盾上 → 交换
+	p.handle_drop("bag", _bag_key(0, Vector2i(0,0)), p.grab_payload("pool", "iron_sword"))  # 剑 1×2竖 占(0,0)(0,1)
+	p.handle_drop("bag", _bag_key(0, Vector2i(1,0)), p.grab_payload("pool", "shield"))      # 盾 1×2竖 占(1,0)(1,1)
+	# 把剑拖到 (1,0)（盾的占用格）→ 重叠 → 拒绝
 	p.handle_drop("bag", _bag_key(0, Vector2i(1,0)), p.grab_payload("bag", _bag_key(0, Vector2i(0,0))))
-	assert_eq(e["grid"].get(Vector2i(1,0)), "iron_sword", "目标格变成被拖的剑")
-	assert_eq(e["grid"].get(Vector2i(0,0)), "shield", "原格换成被挤掉的盾")
+	assert_eq(e["grid"].get(Vector2i(0,0)), "iron_sword", "重叠被拒 → 剑留在原位")
+	assert_eq(e["grid"].get(Vector2i(1,0)), "shield", "盾也没被挤动")
+
+func test_drag_bag_to_free_spot_moves() -> void:
+	# 移到空处 → 成功移动（形状放得下）
+	var e := _warrior_entry()
+	var owned := { "iron_sword": 1 }
+	var p = _make_panel([e], owned, { Vector2i(0,0): e["hero"] })
+	p.handle_drop("bag", _bag_key(0, Vector2i(0,0)), p.grab_payload("pool", "iron_sword"))
+	# 从 (0,0) 移到 (2,0)（空、界内）
+	p.handle_drop("bag", _bag_key(0, Vector2i(2,0)), p.grab_payload("bag", _bag_key(0, Vector2i(0,0))))
+	assert_false(e["grid"].has(Vector2i(0,0)), "原锚点已空")
+	assert_eq(e["grid"].get(Vector2i(2,0)), "iron_sword", "移动到新锚点")
+
+func test_drag_pool_to_bag_out_of_bounds_rejected() -> void:
+	# 1×3 竖法杖放在 row2 会越到 row4 → 拒绝，物品留库存
+	var m := _warrior_entry()
+	var owned := { "staff": 1 }
+	var p = _make_panel([m], owned, { Vector2i(0,0): m["hero"] })
+	p.handle_drop("bag", _bag_key(0, Vector2i(0,2)), p.grab_payload("pool", "staff"))
+	assert_false(m["grid"].has(Vector2i(0,2)), "越界落点被拒 → 未放入背包")
+	assert_eq(int(owned.get("staff", 0)), 1, "法杖留在库存")
 
 
 func test_drag_hero_swaps_squad() -> void:

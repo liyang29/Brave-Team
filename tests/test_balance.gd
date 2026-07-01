@@ -28,9 +28,9 @@ func _balance_nodes() -> Array:
 # 好 build：协同相邻 + 放对人 + 带本职技能书
 func _good_grids() -> Array:
 	return [
-		# 战士：开刃(剑+磨刀石) + 重装(盾+甲) + 斩击书
+		# 战士：开刃(剑+磨刀石) + 重装(盾+甲) + 斩击书（剑/盾1×2竖、甲2×2）
 		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "book_slash",
-		  Vector2i(0,1): "shield", Vector2i(1,1): "chainmail" },
+		  Vector2i(3,0): "shield", Vector2i(1,1): "chainmail" },
 		# 法师：共鸣(法杖+魔典) + 火球书
 		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome", Vector2i(2,0): "book_fireball" },
 		# 牧师：生机(护符+红宝石) + 圣徽 + 治疗书
@@ -45,10 +45,10 @@ func _combo_grids() -> Array:
 	return [
 		# 战士：开刃 + 重装 + 斩击书 + 横扫书（一回合 slash→cleave，MP40 放完即空 → 首回合爆发）
 		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "book_slash",
-		  Vector2i(0,1): "shield", Vector2i(1,1): "chainmail", Vector2i(2,1): "book_cleave" },
+		  Vector2i(3,0): "shield", Vector2i(1,1): "chainmail", Vector2i(0,2): "book_cleave" },
 		# 法师：共鸣 + 火球书 + 冰枪书 + 法力护符（+30蓝续航；一回合 fireball→ice_lance）
 		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome", Vector2i(2,0): "book_fireball",
-		  Vector2i(0,1): "mana_charm", Vector2i(1,1): "book_icelance" },
+		  Vector2i(1,1): "mana_charm", Vector2i(1,2): "book_icelance" },
 		# 牧师：生机 + 治疗书 + 净化书（牧师无第 2 攻击书 → 仍是辅助，非连招 carry）
 		{ Vector2i(0,0): "holy_symbol", Vector2i(2,0): "book_heal",
 		  Vector2i(0,1): "amulet", Vector2i(1,1): "charm", Vector2i(2,1): "book_purify" },
@@ -57,7 +57,7 @@ func _combo_grids() -> Array:
 # 中庸 build：放对人、有装备有技能书，但没凑相邻协同（衡量"协同到底多关键"）
 func _ok_grids() -> Array:
 	return [
-		{ Vector2i(0,0): "iron_sword", Vector2i(2,0): "chainmail", Vector2i(2,1): "book_slash" },
+		{ Vector2i(0,0): "iron_sword", Vector2i(2,0): "chainmail", Vector2i(1,0): "book_slash" },
 		{ Vector2i(0,0): "staff", Vector2i(2,0): "book_fireball" },
 		{ Vector2i(0,0): "amulet", Vector2i(2,0): "book_heal" },
 	]

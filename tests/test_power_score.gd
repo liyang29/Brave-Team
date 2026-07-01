@@ -88,7 +88,7 @@ func test_team_power_sums_heroes() -> void:
 func test_hero_and_enemy_same_scale() -> void:
 	# 同尺度健全性检查：一个建好背包的英雄，量级应和怪物可比（不是天差地别）
 	var hero := Power.hero_power(_entry({
-		Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(0,1): "shield" }))
+		Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "shield" }))
 	var wolf := Power.enemy_power(MonsterFactory.create("wolf"))
 	assert_gt(hero, 0.0, "英雄战力>0")
 	assert_gt(hero, wolf * 0.2, "英雄与野狼同量级（非数量级差异）")

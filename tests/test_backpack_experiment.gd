@@ -431,8 +431,8 @@ func test_promote_if_front_empty() -> void:
 
 func test_guard_armor_and_vital() -> void:
 	var grid := {
-		Vector2i(0,0): "shield", Vector2i(0,1): "chainmail",  # guard+armor 相邻(下)
-		Vector2i(2,0): "amulet", Vector2i(2,1): "charm",      # vital+vital 相邻(下)
+		Vector2i(0,0): "shield", Vector2i(1,0): "chainmail",  # 盾(0,0-0,1) + 甲2×2(1-2,0-1) 相邻 → 重装
+		Vector2i(0,3): "amulet", Vector2i(1,3): "charm",      # vital+vital 相邻 → 生机
 	}
 	var b := Backpack.compute(grid)
 	assert_true("重装" in b["synergies"], "盾+甲触发重装")
@@ -512,16 +512,17 @@ func _run(grids: Array) -> int:
 func test_smart_pack_beats_lazy_pack() -> void:
 	# 巧搭：协同相邻 + 放对人（剑系给战士、法器给法师、生命/圣物给牧师）
 	var good := [
-		{ Vector2i(0,0): "iron_sword", Vector2i(1,0): "whetstone", Vector2i(2,0): "longsword",
-		  Vector2i(0,1): "shield", Vector2i(1,1): "chainmail" },
+		# 战士：开刃(长剑/铁剑+磨刀石) + 重装(盾+甲)。形状：长剑1×3竖、铁剑/盾1×2竖、甲2×2
+		{ Vector2i(0,0): "longsword", Vector2i(1,0): "whetstone", Vector2i(1,1): "iron_sword",
+		  Vector2i(2,0): "shield", Vector2i(2,2): "chainmail" },
 		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome" },
 		{ Vector2i(0,0): "holy_symbol", Vector2i(0,1): "amulet", Vector2i(1,1): "charm" },
 	]
 	# 乱搭：同样的物品，但无相邻协同 + 放错人（法器丢给战士、剑丢给法师）
 	var bad := [
-		{ Vector2i(0,0): "staff", Vector2i(2,0): "tome", Vector2i(0,1): "holy_symbol" },
+		{ Vector2i(0,0): "staff", Vector2i(2,0): "tome", Vector2i(2,2): "holy_symbol" },
 		{ Vector2i(0,0): "iron_sword", Vector2i(2,0): "longsword" },
-		{ Vector2i(0,0): "shield", Vector2i(2,0): "chainmail", Vector2i(0,1): "amulet", Vector2i(2,1): "charm" },
+		{ Vector2i(0,0): "shield", Vector2i(2,0): "chainmail", Vector2i(0,3): "amulet", Vector2i(2,3): "charm" },
 	]
 	var good_wins := _run(good)
 	var bad_wins := _run(bad)

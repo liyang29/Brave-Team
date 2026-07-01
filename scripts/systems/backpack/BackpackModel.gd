@@ -14,13 +14,13 @@ extends RefCounted
 # 每件：name + 属性(atk/def/hp/magic) + tag(用于协同) + rarity(战利品掉落权重档)
 # rarity: "common"/"rare"/"epic"，权重见 LootTable.RARITY_WEIGHTS。
 const ITEMS: Dictionary = {
-	"iron_sword":  { "name": "铁剑",   "atk": 6,  "tag": "blade",   "rarity": "common" },
-	"longsword":   { "name": "长剑",   "atk": 8,  "tag": "blade",   "rarity": "rare" },
+	"iron_sword":  { "name": "铁剑",   "atk": 6,  "tag": "blade",   "shape": "1x2v", "rarity": "common" },
+	"longsword":   { "name": "长剑",   "atk": 8,  "tag": "blade",   "shape": "1x3v", "rarity": "rare" },
 	"whetstone":   { "name": "磨刀石", "atk": 2,  "tag": "sharpen", "rarity": "common" },
-	"shield":      { "name": "圆盾",   "def": 5,  "tag": "guard",   "rarity": "common" },
-	"chainmail":   { "name": "锁甲",   "def": 6, "hp": 10, "tag": "armor", "rarity": "rare" },
-	"leather":     { "name": "皮甲",   "def": 3, "hp": 15, "tag": "armor", "rarity": "common" },
-	"staff":       { "name": "法杖",   "magic": 6, "tag": "arcane", "rarity": "rare" },
+	"shield":      { "name": "圆盾",   "def": 5,  "tag": "guard",   "shape": "1x2v", "rarity": "common" },
+	"chainmail":   { "name": "锁甲",   "def": 6, "hp": 10, "tag": "armor", "shape": "2x2", "rarity": "rare" },
+	"leather":     { "name": "皮甲",   "def": 3, "hp": 15, "tag": "armor", "shape": "1x2v", "rarity": "common" },
+	"staff":       { "name": "法杖",   "magic": 6, "tag": "arcane", "shape": "1x3v", "rarity": "rare" },
 	"tome":        { "name": "魔典",   "magic": 4, "tag": "arcane", "rarity": "common" },
 	"holy_symbol": { "name": "圣徽",   "magic": 5, "tag": "holy",   "rarity": "rare" },
 	"amulet":      { "name": "护符",   "hp": 12, "def": 2, "tag": "vital", "rarity": "common" },
@@ -61,8 +61,64 @@ const ITEMS: Dictionary = {
 	"book_purify":   { "name": "净化书", "tag": "skillbook", "skill_id": "purify",    "cd": 2, "rarity": "common" },
 }
 
+# ── 网格 & 物品形状（空间填装）─────────────────────────────────────────────────
+# 背包 = GRID_W×GRID_H 网格。物品占多格（形状）→ "塞得下"本身是取舍。
+# grid 结构：{ 锚点Vector2i: item_id }，一条目 = 一件 = 一个实例；
+#   占用格 = 锚点 + SHAPES[物品.shape]（缺省 "1x1"，即老物品一格、完全向后兼容）。
+# 形状用【具名表】配置：物品只写 "shape": "2x2"；加新形状 = SHAPES 加一行，全物品可用。
+const GRID_W := 4
+const GRID_H := 4
+
+const SHAPES: Dictionary = {
+	"1x1":  [Vector2i(0, 0)],
+	"1x2h": [Vector2i(0, 0), Vector2i(1, 0)],                   # 横 1×2
+	"1x2v": [Vector2i(0, 0), Vector2i(0, 1)],                   # 竖 1×2
+	"1x3h": [Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],   # 横 1×3
+	"1x3v": [Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)],   # 竖 1×3
+	"2x2":  [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
+}
+
+## 物品的形状名（缺省 1x1）。
+static func shape_name(item_id: String) -> String:
+	return ITEMS.get(item_id, {}).get("shape", "1x1")
+
+## 物品的形状偏移列表（相对锚点）。
+static func shape_offsets(item_id: String) -> Array:
+	return SHAPES.get(shape_name(item_id), SHAPES["1x1"])
+
+## 一件物品放在 anchor 时占用的所有格子。
+static func item_cells(item_id: String, anchor: Vector2i) -> Array:
+	var out: Array = []
+	for off in shape_offsets(item_id):
+		out.append(anchor + off)
+	return out
+
+## 格子是否在 GRID_W×GRID_H 界内。
+static func in_bounds(cell: Vector2i) -> bool:
+	return cell.x >= 0 and cell.x < GRID_W and cell.y >= 0 and cell.y < GRID_H
+
+## grid 的占用图 { 格子 -> 锚点 }。ignore_anchor 可排除某件（拖动它自己时用）。
+static func occupied_cells(grid: Dictionary, ignore_anchor = null) -> Dictionary:
+	var occ: Dictionary = {}
+	for anchor in grid:
+		if ignore_anchor != null and anchor == ignore_anchor:
+			continue
+		for c in item_cells(grid[anchor], anchor):
+			occ[c] = anchor
+	return occ
+
+## 能否把 item_id 放到 anchor：所有占用格都在界内且不与别件重叠。
+## ignore_anchor：移动某件到新位时排除它自身原占用（否则会与自己冲突）。
+static func can_place(grid: Dictionary, item_id: String, anchor: Vector2i, ignore_anchor = null) -> bool:
+	var occ: Dictionary = occupied_cells(grid, ignore_anchor)
+	for c in item_cells(item_id, anchor):
+		if not in_bounds(c) or occ.has(c):
+			return false
+	return true
+
+
 # ── 邻接协同规则 ──────────────────────────────────────────────────────────────
-# 两个 tag 在网格中正交相邻 → 给该背包持有者加成（每对相邻只算一次）
+# 两件不同物品的格子在网格中正交相邻 → 给该背包持有者加成（每对物品每种协同只算一次）
 const SYNERGIES: Array = [
 	{ "a": "blade",  "b": "sharpen", "bonus": { "atk": 6 },            "name": "开刃" },
 	{ "a": "guard",  "b": "armor",   "bonus": { "def": 5, "hp": 12 },  "name": "重装" },
@@ -113,27 +169,46 @@ static func compute(grid: Dictionary) -> Dictionary:
 	for be in book_cells:
 		books.append({ "id": be["id"], "cd": be["cd"] })
 
-	# 邻接协同：每格只看右、下邻居，保证每对相邻只算一次
-	for cell in grid:
-		var tag: String = ITEMS.get(grid[cell], {}).get("tag", "")
-		if tag == "":
+	# 邻接协同（形状感知）：两件【不同物品实例】的占用格正交相邻 → 触发一次。
+	#   任意一对相邻格即触发，同一对物品的同种协同只算一次（"任意格相邻=触发一次"）。
+	var occ: Dictionary = occupied_cells(grid)   # 格子 -> 锚点（物品实例）
+	var fired_pairs: Dictionary = {}             # "锚A|锚B|协同名" -> 已触发
+	for cell in occ:
+		var anchor_a: Vector2i = occ[cell]
+		var tag_a: String = ITEMS.get(grid[anchor_a], {}).get("tag", "")
+		if tag_a == "":
 			continue
-		for nb in [cell + Vector2i(1, 0), cell + Vector2i(0, 1)]:
-			if not grid.has(nb):
+		for nb in [cell + Vector2i(1, 0), cell + Vector2i(-1, 0), cell + Vector2i(0, 1), cell + Vector2i(0, -1)]:
+			if not occ.has(nb):
 				continue
-			var tag2: String = ITEMS.get(grid[nb], {}).get("tag", "")
+			var anchor_b: Vector2i = occ[nb]
+			if anchor_b == anchor_a:
+				continue                          # 同一件物品的相邻格，不算协同
+			var tag_b: String = ITEMS.get(grid[anchor_b], {}).get("tag", "")
 			for s in SYNERGIES:
 				var sa: String = s["a"]
 				var sb: String = s["b"]
-				if (tag == sa and tag2 == sb) or (tag == sb and tag2 == sa):
-					var bonus: Dictionary = s["bonus"]
-					atk   += int(bonus.get("atk", 0))
-					def_v += int(bonus.get("def", 0))
-					hp    += int(bonus.get("hp", 0))
-					magic += int(bonus.get("magic", 0))
-					fired.append(s["name"])
+				if not ((tag_a == sa and tag_b == sb) or (tag_a == sb and tag_b == sa)):
+					continue
+				var pk: String = _pair_key(anchor_a, anchor_b) + "|" + String(s["name"])
+				if fired_pairs.has(pk):
+					continue                      # 这对物品的这种协同已触发过
+				fired_pairs[pk] = true
+				var bonus: Dictionary = s["bonus"]
+				atk   += int(bonus.get("atk", 0))
+				def_v += int(bonus.get("def", 0))
+				hp    += int(bonus.get("hp", 0))
+				magic += int(bonus.get("magic", 0))
+				fired.append(s["name"])
 
 	return { "atk": atk, "def": def_v, "hp": hp, "magic": magic, "mp": mp, "synergies": fired, "books": books, "extra": extra }
+
+
+# 两个锚点的无序配对键（同一对物品无论谁先都得同一 key）。
+static func _pair_key(a: Vector2i, b: Vector2i) -> String:
+	var sa := "%d,%d" % [a.x, a.y]
+	var sb := "%d,%d" % [b.x, b.y]
+	return (sa + "|" + sb) if sa < sb else (sb + "|" + sa)
 
 
 ## 物品显示名

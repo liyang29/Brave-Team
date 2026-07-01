@@ -17,9 +17,7 @@ extends VBoxContainer
 const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const DragSlot = preload("res://scripts/ui/DragSlot.gd")
-
-const BAG_COLS := 3
-const BAG_ROWS := 2
+const BagGridView = preload("res://scripts/ui/BagGridView.gd")
 
 # 注入状态（引用宿主对象）
 var _roster: Array = []
@@ -29,7 +27,7 @@ var _squad_slots: Dictionary = {}
 # UI 节点引用
 var _pool_box: HFlowContainer
 var _squad_ui: Dictionary = {}     # Vector2i -> DragSlot
-var _bag_slots: Array = []         # 每英雄一份 { Vector2i: DragSlot }
+var _bag_views: Array = []         # 每英雄一个 BagGridView（自绘 4×4 多格背包）
 var _stat_labels: Array = []       # 每英雄一个 Label
 
 
@@ -76,7 +74,7 @@ func _build_ui() -> void:
 	add_child(_section("队伍站位（直接把人拖到另一格 · 前排挨打、后排被保护）"))
 	add_child(_build_squad_board())
 
-	add_child(_section("我方小队（每人 3×2 背包 · 物品可在背包间互拖）"))
+	add_child(_section("我方小队（每人 4×4 空间背包 · 物品有形状、拖拽落点绿=可放/红=放不下 · 可在背包间互拖）"))
 	var heroes_row := HBoxContainer.new()
 	heroes_row.add_theme_constant_override("separation", 16)
 	for i in range(_roster.size()):
@@ -131,19 +129,11 @@ func _build_hero_panel(index: int) -> Control:
 	head.add_theme_font_size_override("font_size", 16)
 	box.add_child(head)
 
-	var grid := GridContainer.new()
-	grid.columns = BAG_COLS
-	grid.add_theme_constant_override("h_separation", 4)
-	grid.add_theme_constant_override("v_separation", 4)
-	var cells: Dictionary = {}
-	for row in range(BAG_ROWS):
-		for col in range(BAG_COLS):
-			var cell := Vector2i(col, row)
-			var slot := _new_slot("bag", { "hero_index": index, "cell": cell }, Vector2(96, 44))
-			cells[cell] = slot
-			grid.add_child(slot)
-	_bag_slots.append(cells)
-	box.add_child(grid)
+	var bag := BagGridView.new()
+	bag.panel = self
+	bag.hero_index = index
+	_bag_views.append(bag)
+	box.add_child(bag)
 
 	var stat := Label.new()
 	stat.custom_minimum_size = Vector2(200, 0)
@@ -161,16 +151,7 @@ func refresh() -> void:
 	# 全队最终属性（含光环），与开战时一致——保证"看到的=打出来的"
 	var squad: Array = Loadout.squad_stats(_roster, _squad_slots)
 	for i in range(_roster.size()):
-		var grid: Dictionary = _roster[i]["grid"]
-		var cells: Dictionary = _bag_slots[i]
-		for cell in cells:
-			var slot = cells[cell]
-			if grid.has(cell):
-				slot.set_display(Backpack.item_name(grid[cell]), Color(0.75, 1.0, 0.75))
-				slot.tooltip_text = Backpack.item_tooltip(grid[cell])
-			else:
-				slot.set_display("·", Color(1, 1, 1))
-				slot.tooltip_text = ""
+		_bag_views[i].queue_redraw()   # 自绘背包读 grid 实时重画
 		_stat_labels[i].text = _stat_text(_roster[i], squad[i])
 	for cell in _squad_ui:
 		var h = _squad_slots.get(cell)
@@ -270,6 +251,18 @@ func handle_drop(kind: String, key, data: Dictionary) -> void:
 	call_deferred("refresh")
 
 
+## 背包目标能否接收该物品（BagGridView 算落点幽灵 + 校验用）。
+## 形状感知：锚点处放得下(界内+不重叠) 才行；同背包移动排除物品自身原占用。
+func bag_can_drop(hero_index: int, id: String, src: Dictionary, anchor: Vector2i) -> bool:
+	if src.get("kind", "") == "pool" and int(_pool.get(id, 0)) <= 0:
+		return false
+	var dest_grid: Dictionary = _roster[hero_index]["grid"]
+	var ignore = null
+	if src.get("kind", "") == "bag" and int(src.get("hero_index", -1)) == hero_index:
+		ignore = src.get("cell")
+	return Backpack.can_place(dest_grid, id, anchor, ignore)
+
+
 func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
 	var id: String = data["id"]
 	var src: Dictionary = data["src"]
@@ -280,30 +273,16 @@ func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
 			_owned_add(id, 1)
 		return                        # 库存 → 库存：无操作
 
-	# dest_kind == "bag"
+	# dest_kind == "bag"（形状感知：放得下才放，不做交换；放不下则原地不动）
 	var hi: int = dest_key["hero_index"]
-	var c: Vector2i = dest_key["cell"]
-	var dest_grid: Dictionary = _roster[hi]["grid"]
-	var existing: String = dest_grid.get(c, "")
-
-	if src["kind"] == "pool":         # 库存 → 背包格
-		if int(_pool.get(id, 0)) <= 0:
-			return
+	var anchor: Vector2i = dest_key["cell"]
+	if not bag_can_drop(hi, id, src, anchor):
+		return                        # 越界/重叠/库存空 → 物品留在原处
+	if src["kind"] == "pool":         # 库存 → 背包
 		_owned_add(id, -1)
-		if existing != "":
-			_owned_add(existing, 1)   # 被挤掉的退回库存
-		dest_grid[c] = id
-	elif src["kind"] == "bag":        # 背包格 → 背包格（同/跨英雄）
-		var shi: int = src["hero_index"]
-		var sc: Vector2i = src["cell"]
-		if shi == hi and sc == c:
-			return
-		var src_grid: Dictionary = _roster[shi]["grid"]
-		dest_grid[c] = id
-		if existing != "":
-			src_grid[sc] = existing   # 交换
-		else:
-			src_grid.erase(sc)        # 移动
+	elif src["kind"] == "bag":        # 背包 → 背包（同/跨英雄）：先从原位移除
+		_roster[src["hero_index"]]["grid"].erase(src["cell"])
+	_roster[hi]["grid"][anchor] = id
 
 
 func _drop_hero(data: Dictionary, dest_cell: Vector2i) -> void:

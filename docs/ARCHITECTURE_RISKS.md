@@ -24,11 +24,10 @@
 - **风险**:掉落/商店/套装/合成长出来后,两套并存会反复绊人。
 - **证据**:`PROJECT_STRUCTURE.md` 第 57 行 ⚠️ 注。
 
-### R2. 地图是写死的线性结构(分支地图的真正拦路石)　⬜
-- **问题**:`RunManager.nodes: Array` + `depth: int` 索引——**线性数组+整数下标表达不了分支**(杀戮尖塔式一节点连多后继)。
-- **建议**:数据模型升级为**节点图**(节点带 id + 邻接边),`depth` 换成"当前节点 id";写吃"群系配置(类型+权重+长度+分支规则)"的 `MapGenerator`(放 `systems/run/`)。
-- **依赖**:R3/R4 是它的前置清理(已完成)。这是地图随机生成的主体工程。
-- **证据**:`RunManager._build_map()`、`SCALING_ROADMAP.md` §2"地图"行。
+### R2. 地图是写死的线性结构(分支地图的真正拦路石)　✅ 已修(2026-07-01)
+- **原问题**:`RunManager.nodes: Array` + `depth: int` 索引——**线性数组+整数下标表达不了分支**(杀戮尖塔式一节点连多后继)。
+- **已做**:数据模型升级为**节点图**(`map_nodes` 每节点带 id + `next` 邻接边),`depth` 换成 `current_node_id` + `travel_to`(严格连线约束)。新增吃 `MapConfig`(层数/宽度/密度/类型权重/内容池)的 `MapGenerator`(尖塔式分层 DAG、路径铺图保证连通无死路、种子可复现),`systems/run/`。渲染 `MapGraphView`(按列摆节点 + 画连接线)。`_build_map` 删除。配 GUT(`test_map_generator` 属性测试 + `test_run_manager` 导航重写);190/190 绿。
+- **遗留**:event 事件节点(新房间界面)未做;R7(存档不友好:对象引用 + Vector2i 键)仍在,图节点用 String id 已比旧结构好序列化。
 
 ---
 
@@ -70,7 +69,7 @@
 1. ✅ **R4**(`_advance`,几行)
 2. ✅ **R3**(节点类型注册表)
 3. ⬜ **R6**(`EncounterData` 包战斗输入)
-4. ⬜ **R2**(图模型 + `MapGenerator`)— 最大,R3/R4 是其前置
+4. ✅ **R2**(图模型 + `MapGenerator` + 分支地图,2026-07-01)
 5. ⬜ **R1**(物品系统统一)— 可独立挑时间做
 6. ⬜ **R5/R7/R8** — 随 存档/meta/事件 需求到来时一并处理
 

@@ -13,10 +13,12 @@ extends Node
 
 signal state_changed(new_state)
 signal gold_changed(new_gold)
-signal depth_changed(new_depth)
+signal node_changed(new_node_id)
 
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
+const MapConfig = preload("res://scripts/systems/run/MapConfig.gd")
+const MapGenerator = preload("res://scripts/systems/run/MapGenerator.gd")
 
 enum State { NONE, MAP, ENCOUNTER, DRAFT, VILLAGE, REST, VICTORY, GAME_OVER }
 
@@ -43,9 +45,15 @@ const STARTER_TEAM: Array = []
 var state: int = State.NONE
 var party: Array = []        # Array[Hero]，整局复用，HP 累积
 var gold: int = 0
-var depth: int = 0           # 当前所在节点索引（0 起）
-var nodes: Array = []        # [{ type, name, enemies:Array[EnemyData], gold:int }]
 var last_result = null       # 上一场 BattleResult（结果界面用）
+
+# ── 分支地图（尖塔式分层 DAG；取代旧"线性数组 + depth 索引"）─────────────────
+# map_nodes：id -> { id, layer, col, type, name, enemies, gold, next:Array[id] }
+#   next = 后继节点 id（有向边）；"严格连线约束" = 只能去当前节点 next 里的节点。
+var map_nodes: Dictionary = {}
+var current_node_id: String = ""   # 玩家当前所在/刚打完的节点 id（取代 depth）
+var map_layers: int = 0            # 总层数（RunMap 分层渲染 + 进度显示）
+var map_seed: int = -1             # 本局地图种子（复现/存档/调试）
 
 # ── 背包构筑状态（Step 2：跨整局保留，供将来 prep 界面 + BackpackLoadout 用）──
 # roster：队伍名册，每个元素 = { "hero": Hero, "base": Dictionary, "grid": Dictionary }
@@ -70,7 +78,7 @@ var shop_stock: Array = []
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
 
-func start_run() -> void:
+func start_run(config: Dictionary = MapConfig.DEFAULT, seed: int = -1) -> void:
 	roster = _make_starter_roster()
 	party = roster.map(func(e): return e["hero"])   # 英雄列表视图（向后兼容）
 	owned_items = {}                                 # 空背包起手，靠商店/战利品积累
@@ -79,20 +87,47 @@ func start_run() -> void:
 	pending_draft = []
 	shop_stock = []
 	gold = START_GOLD                                # 起步金币，开局村庄商店采购
-	depth = 0
-	nodes = _build_map()
+	var map: Dictionary = MapGenerator.generate(config, seed)
+	map_nodes = map["nodes"]
+	current_node_id = map["start_id"]                # 起点 = 第 0 层村庄
+	map_layers = int(map["layers"])
+	map_seed = int(map["seed"])
 	last_result = null
 	_set_state(State.MAP)
 
 
 func current_node() -> Dictionary:
-	return nodes[depth] if depth < nodes.size() else {}
+	return map_nodes.get(current_node_id, {})
+
+func current_layer() -> int:
+	return int(current_node().get("layer", 0))
 
 func is_boss_node() -> bool:
 	return current_node().get("type", "") == "boss"
 
 func alive_party() -> Array:
 	return party.filter(func(h): return h.is_alive())
+
+
+# ── 地图导航（严格连线约束：只能去当前节点的后继）──────────────────────────────
+
+## 当前节点可前往的后继 id 列表（RunMap 据此点亮可选节点）。
+func reachable_next() -> Array:
+	return (current_node().get("next", []) as Array).duplicate()
+
+## 能否前往 next_id：必须是当前节点的直接后继。
+func can_travel_to(next_id: String) -> bool:
+	return next_id in current_node().get("next", [])
+
+## 前往一个后继节点并进入它（尖塔式：在地图点节点 = 走过去 + 进房间）。
+## 由 RunMap 在玩家点选后调用；enter_current_node 会跑 on_enter + 切到房间状态。
+func travel_to(next_id: String) -> bool:
+	if not can_travel_to(next_id):
+		return false
+	current_node_id = next_id
+	node_changed.emit(current_node_id)
+	enter_current_node()
+	return true
 
 
 ## 进入当前节点：由 NodeTypes 注册表决定进哪个状态 + 是否要进入前准备。
@@ -124,21 +159,16 @@ func rest_heal() -> Array:
 	return report
 
 
-## 前进到下一节点：到尽头则通关，否则回地图。
-## 调用方先各自清理自己的临时状态（商店/招募/draft），再调本方法统一前进——
-## 避免 "depth+=1 → 越界检查 → set MAP/VICTORY" 这段在多个 leave_*/finish 里重复出错。
-func _advance() -> void:
-	depth += 1
-	depth_changed.emit(depth)
-	if depth >= nodes.size():
-		_set_state(State.VICTORY)
-	else:
-		_set_state(State.MAP)
+## 打完/离开当前节点 → 回地图让玩家选后继（分支图下"前进"由玩家在 RunMap 点选，
+## 经 travel_to 完成；这里只负责"结束当前节点、回到地图"）。
+## 通关是走到魔王节点打赢（resolve_encounter 里判），不再靠"走到数组末尾"。
+func _return_to_map() -> void:
+	_set_state(State.MAP)
 
 
-## 离开休息点 → 前进到下一节点。
+## 离开休息点 → 回地图选后继。
 func leave_rest() -> void:
-	_advance()
+	_return_to_map()
 
 
 ## 商店购买：金币够且在售 → 扣钱、入库、下架。返回是否成功。
@@ -187,11 +217,11 @@ func can_leave_village() -> bool:
 	return false
 
 
-## 离开村庄 → 前进到下一节点（商店+招募都在村庄；村庄不会是最后一个节点）。
+## 离开村庄 → 回地图选后继（商店+招募都在村庄；村庄不会是魔王节点）。
 func leave_village() -> void:
 	shop_stock = []
 	tavern_offers = []
-	_advance()
+	_return_to_map()
 
 # 抽 n 个英雄池模板作候选（同一次不重复，避免同店出现两个同样的人）。
 func _roll_recruits(n: int) -> Array:
@@ -212,7 +242,7 @@ func _place_in_empty_slot(hero) -> void:
 ## 遭遇结束回报：
 ##   负 → 全灭游戏结束；
 ##   魔王胜 → 直接通关（不抽战利品）；
-##   普通胜 → 拿钱 + 抽 3 件战利品进入 DRAFT（depth 待 finish_draft 后再前进）。
+##   普通/精英胜 → 拿钱 + 抽 3 件战利品进入 DRAFT（draft 完成后回地图选后继）。
 func resolve_encounter(won: bool, result = null) -> void:
 	last_result = result
 	if not won:
@@ -220,20 +250,18 @@ func resolve_encounter(won: bool, result = null) -> void:
 		return
 	add_gold(int(current_node().get("gold", 0)))
 	if is_boss_node():
-		depth += 1
-		depth_changed.emit(depth)
-		_set_state(State.VICTORY)
+		_set_state(State.VICTORY)               # 打赢魔王 = 通关（魔王是唯一汇点）
 		return
 	pending_draft = LootTable.draw_draft(3)
 	_set_state(State.DRAFT)
 
 
-## 战利品 draft 结束：留下的物品进库存 → 前进到下一节点（或通关）。
+## 战利品 draft 结束：留下的物品进库存 → 回地图选后继。
 func finish_draft(kept: Array) -> void:
 	for id in kept:
 		owned_items[id] = int(owned_items.get(id, 0)) + 1
 	pending_draft = []
-	_advance()
+	_return_to_map()
 
 
 func add_gold(n: int) -> void:
@@ -296,19 +324,5 @@ func _starter(cls: int, nm: String, hp: int, atk: int, def_v: int, spd: int,
 	return hero
 
 
-# ── 地图（村庄 → 3 战斗 + 中途泉水 + 魔王）────────────────────────────────────
-# 怪物数值见 MonsterFactory.ENEMIES（加怪=加一行）；难度由平衡 harness + 试玩拧。
-
-func _build_map() -> Array:
-	return [
-		_node("village", "村庄", [], 0),
-		_node("battle", "林间遭遇", MonsterFactory.create_group(["wolf", "wolf"]), 20),
-		_node("village", "村镇", [], 0),
-		_node("battle", "剧毒巢穴", MonsterFactory.create_group(["venom_bug", "stone_guard"]), 25),
-		_node("rest",   "泉水", [], 0),
-		_node("battle", "废墟伏击", MonsterFactory.create_group(["bandit", "ranger"]), 30),
-		_node("boss",   "魔王",     MonsterFactory.create_group(["demon_lord", "claw_minion"]), 100),
-	]
-
-func _node(type: String, nm: String, enemies: Array, g: int) -> Dictionary:
-	return { "type": type, "name": nm, "enemies": enemies, "gold": g }
+# 地图现由 MapGenerator.generate(MapConfig.DEFAULT) 随机生成（尖塔式分层 DAG）。
+# 群系/规模/类型分布/内容池全在 MapConfig 配置——加怪=改 MonsterFactory + MapConfig 内容池。

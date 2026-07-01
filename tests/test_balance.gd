@@ -11,6 +11,19 @@ extends GutTest
 const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const TRIALS := 20
 
+# 平衡参考"难度阶梯"：固定的一条线（村庄→战→村→战→泉水→战→魔王），
+# 与随机地图生成解耦——平衡应量的是"数值曲线"，不是随机路线。加/调关就改这里。
+func _balance_nodes() -> Array:
+	return [
+		{ "type": "village", "name": "村庄", "enemies": [] },
+		{ "type": "battle",  "name": "林间遭遇", "enemies": MonsterFactory.create_group(["wolf", "wolf"]) },
+		{ "type": "village", "name": "村镇", "enemies": [] },
+		{ "type": "battle",  "name": "剧毒巢穴", "enemies": MonsterFactory.create_group(["venom_bug", "stone_guard"]) },
+		{ "type": "rest",    "name": "泉水", "enemies": [] },
+		{ "type": "battle",  "name": "废墟伏击", "enemies": MonsterFactory.create_group(["bandit", "ranger"]) },
+		{ "type": "boss",    "name": "魔王", "enemies": MonsterFactory.create_group(["demon_lord", "claw_minion"]) },
+	]
+
 
 # 好 build：协同相邻 + 放对人 + 带本职技能书
 func _good_grids() -> Array:
@@ -89,7 +102,7 @@ func test_per_node_health_report() -> void:
 	RunManager.start_run()
 	gut.p("===== 逐关体检（每关满血单独打 %d 次）=====" % TRIALS)
 	gut.p("关卡            好build  中庸  500金开局(会买)  裸开局(无技能书)")
-	for node in RunManager.nodes:
+	for node in _balance_nodes():
 		var enemies: Array = node.get("enemies", [])
 		if enemies.is_empty():
 			continue
@@ -115,8 +128,7 @@ func _run_track(grids: Array) -> String:
 	RunManager.roster = tm["loadouts"]
 	RunManager.party = RunManager.roster.map(func(e): return e["hero"])
 	RunManager.squad_slots = tm["slots"]
-	for d in range(RunManager.nodes.size()):
-		var node: Dictionary = RunManager.nodes[d]
+	for node in _balance_nodes():
 		match node.get("type"):
 			"village":
 				pass
@@ -147,8 +159,7 @@ func _run_once(grids: Array) -> bool:
 	}
 	for i in range(grids.size()):
 		RunManager.roster[i]["grid"] = grids[i].duplicate()
-	for d in range(RunManager.nodes.size()):
-		var node: Dictionary = RunManager.nodes[d]
+	for node in _balance_nodes():
 		match node.get("type"):
 			"village":
 				pass

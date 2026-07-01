@@ -19,6 +19,7 @@ const SCENE_REST      := "res://scenes/run/Rest.tscn"
 
 const REGISTRY: Dictionary = {
 	"battle":  { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
+	"elite":   { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },   # 精英：复用战斗管道，敌人更强/金币更多
 	"boss":    { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
 	"village": { "scene": SCENE_VILLAGE,   "state": "VILLAGE", "on_enter": "_enter_village" },
 	"rest":    { "scene": SCENE_REST,      "state": "REST" },

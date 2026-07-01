@@ -72,13 +72,12 @@ func test_no_dead_ends() -> void:
 			assert_false((nodes[id]["next"] as Array).is_empty(), "seed %d：节点 %s 非死路" % [s, id])
 
 func test_only_registered_types_spawn() -> void:
-	# 生成器只用已注册类型 → event（本步未注册）不会出现在图里。
+	# 生成器只用已在 NodeTypes 注册的类型（未注册类型不会出现在图里）。
 	for s in SEEDS:
 		var nodes: Dictionary = MapGenerator.generate(MapConfig.DEFAULT, s)["nodes"]
 		for id in nodes:
 			var t: String = nodes[id]["type"]
 			assert_true(NodeTypes.REGISTRY.has(t), "seed %d：类型 '%s' 已注册" % [s, t])
-			assert_ne(t, "event", "seed %d：event 未注册前不应生成" % s)
 
 func test_elite_respects_min_layer() -> void:
 	# 精英不早于 min_layer（默认 3）。

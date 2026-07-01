@@ -16,6 +16,7 @@ extends RefCounted
 const SCENE_ENCOUNTER := "res://scenes/run/Encounter.tscn"
 const SCENE_VILLAGE   := "res://scenes/run/Village.tscn"
 const SCENE_REST      := "res://scenes/run/Rest.tscn"
+const SCENE_EVENT     := "res://scenes/run/Event.tscn"
 
 const REGISTRY: Dictionary = {
 	"battle":  { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
@@ -23,6 +24,7 @@ const REGISTRY: Dictionary = {
 	"boss":    { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
 	"village": { "scene": SCENE_VILLAGE,   "state": "VILLAGE", "on_enter": "_enter_village" },
 	"rest":    { "scene": SCENE_REST,      "state": "REST" },
+	"event":   { "scene": SCENE_EVENT,     "state": "EVENT", "on_enter": "_enter_event" },
 }
 
 # 未注册类型的兜底（当作普通战斗遭遇，避免崩溃）。

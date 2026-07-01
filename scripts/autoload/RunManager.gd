@@ -19,8 +19,10 @@ const LootTable = preload("res://scripts/systems/LootTable.gd")
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 const MapConfig = preload("res://scripts/systems/run/MapConfig.gd")
 const MapGenerator = preload("res://scripts/systems/run/MapGenerator.gd")
+const EventTable = preload("res://scripts/systems/run/EventTable.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
-enum State { NONE, MAP, ENCOUNTER, DRAFT, VILLAGE, REST, VICTORY, GAME_OVER }
+enum State { NONE, MAP, ENCOUNTER, DRAFT, VILLAGE, REST, EVENT, VICTORY, GAME_OVER }
 
 const START_GOLD := 500
 const SHOP_STOCK_SIZE := 6
@@ -75,6 +77,11 @@ var pending_draft: Array = []
 # shop_stock：当前商店在售物品（item_id 数组，买一件移除一件），进商店时生成。
 var shop_stock: Array = []
 
+# ── 事件节点状态（存档友好：只存 String id）───────────────────────────────────
+# current_event：当前事件 id（EventScreen 读它）；used_events：本局遇过的事件 id（不重复）。
+var current_event: String = ""
+var used_events: Array = []
+
 
 # ── 跑局生命周期 ──────────────────────────────────────────────────────────────
 
@@ -86,6 +93,8 @@ func start_run(config: Dictionary = MapConfig.DEFAULT, seed: int = -1) -> void:
 	tavern_offers = []
 	pending_draft = []
 	shop_stock = []
+	current_event = ""
+	used_events = []
 	gold = START_GOLD                                # 起步金币，开局村庄商店采购
 	var map: Dictionary = MapGenerator.generate(config, seed)
 	map_nodes = map["nodes"]
@@ -143,6 +152,121 @@ func enter_current_node() -> void:
 func _enter_village() -> void:
 	shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)
 	tavern_offers = _roll_recruits(TAVERN_OFFERS)
+
+
+# ── 事件节点 ──────────────────────────────────────────────────────────────────
+
+## 进入事件节点前准备：随机挑一个本局未遇过的事件（全遇过则任意）。
+func _enter_event() -> void:
+	var pool: Array = EventTable.all_ids().filter(func(id): return not (id in used_events))
+	if pool.is_empty():
+		pool = EventTable.all_ids()          # 兜底：都遇过了就允许重复
+	current_event = pool[randi() % pool.size()] if not pool.is_empty() else ""
+
+## 当前事件的选项列表。
+func event_choices() -> Array:
+	return EventTable.get_event(current_event).get("choices", [])
+
+## 第 index 个选项是否可选（门槛满足）。UI 据此灰掉不可选项。
+func event_choice_available(index: int) -> bool:
+	var choices: Array = event_choices()
+	if index < 0 or index >= choices.size():
+		return false
+	return _meets_require(choices[index].get("require", {}))
+
+## 选择事件选项：判门槛 → 应用效果（确定 or 风险 roll）→ 记为遇过。
+## forced_roll≥0 时用它代替随机（测试注入）；返回 { ok, text }。
+func resolve_event_choice(index: int, forced_roll: float = -1.0) -> Dictionary:
+	var choices: Array = event_choices()
+	if index < 0 or index >= choices.size():
+		return { "ok": false, "text": "" }
+	var choice: Dictionary = choices[index]
+	if not _meets_require(choice.get("require", {})):
+		return { "ok": false, "text": "条件不满足。" }
+
+	var text: String = ""
+	if choice.has("risk"):
+		var risk: Dictionary = choice["risk"]
+		var roll: float = forced_roll if forced_roll >= 0.0 else randf()
+		if roll < float(risk.get("chance", 0.0)):
+			_apply_event_effects(risk.get("win", []))
+			text = String(choice.get("result_win", "成功了。"))
+		else:
+			_apply_event_effects(risk.get("lose", []))
+			text = String(choice.get("result_lose", "失败了。"))
+	else:
+		_apply_event_effects(choice.get("effects", []))
+		text = String(choice.get("result", ""))
+
+	if current_event != "" and not (current_event in used_events):
+		used_events.append(current_event)
+	return { "ok": true, "text": text }
+
+## 离开事件 → 回地图选后继。
+func leave_event() -> void:
+	_return_to_map()
+
+
+# 门槛判定：gold(队伍金≥N) / item(库存或任一背包里有) / class(队里有该职业)。
+func _meets_require(require: Dictionary) -> bool:
+	if require.is_empty():
+		return true
+	if require.has("gold") and gold < int(require["gold"]):
+		return false
+	if require.has("item") and not _has_item(String(require["item"])):
+		return false
+	if require.has("class") and not _party_has_class(String(require["class"])):
+		return false
+	return true
+
+# 队伍(库存 + 所有背包)里是否有某物品。
+func _has_item(id: String) -> bool:
+	if int(owned_items.get(id, 0)) > 0:
+		return true
+	for entry in roster:
+		if id in (entry.get("grid", {}) as Dictionary).values():
+			return true
+	return false
+
+# 队里是否有某职业英雄。
+func _party_has_class(class_key: String) -> bool:
+	for h in party:
+		if _class_key_of(h) == class_key:
+			return true
+	return false
+
+func _class_key_of(hero) -> String:
+	match int(hero.hero_class):
+		Hero.HeroClass.WARRIOR: return "warrior"
+		Hero.HeroClass.MAGE:    return "mage"
+		Hero.HeroClass.PRIEST:  return "priest"
+		Hero.HeroClass.ROGUE:   return "rogue"
+		Hero.HeroClass.ARCHER:  return "archer"
+	return ""
+
+# 应用一组效果。
+func _apply_event_effects(effects: Array) -> void:
+	for e in effects:
+		_apply_event_effect(e)
+
+# 应用单个效果（精简 3 种；加新效果类型 = 加一个 match 分支，这就是"升级口"）。
+func _apply_event_effect(effect: Dictionary) -> void:
+	match String(effect.get("type", "")):
+		"gold":
+			gold = max(0, gold + int(effect.get("amount", 0)))
+			gold_changed.emit(gold)
+		"item":
+			var id: String = String(effect.get("id", ""))
+			if id != "":
+				owned_items[id] = int(owned_items.get(id, 0)) + int(effect.get("count", 1))
+		"hp_pct":
+			var pct: float = float(effect.get("amount", 0.0))
+			for h in party:
+				if not h.is_alive():
+					continue
+				var mx: int = h.get_max_hp()
+				var delta: int = int(round(mx * pct))
+				h.current_hp = clampi(h.current_hp + delta, 1, mx)   # 钳 ≥1：事件不猝死
 
 
 ## 泉水/休息：全员存活英雄回复 REST_HEAL_PCT 比例的最大血（钳到上限）。

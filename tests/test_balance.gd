@@ -9,6 +9,8 @@ extends GutTest
 # ─────────────────────────────────────────────────────────────────────────────
 
 const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
+const MapGenerator = preload("res://scripts/systems/run/MapGenerator.gd")
+const MapConfig = preload("res://scripts/systems/run/MapConfig.gd")
 const TRIALS := 20
 
 # 平衡参考"难度阶梯"：固定的一条线（村庄→战→村→战→泉水→战→魔王），
@@ -274,6 +276,35 @@ func _boss_sharpness(grids: Array) -> Dictionary:
 			mx += e["hero"].get_max_hp()
 		hp_frac_sum += (float(hp) / float(mx)) if mx > 0 else 0.0
 	return { "turns": float(turns_sum) / TRIALS, "hp_pct": hp_frac_sum / TRIALS }
+
+
+# ── 深度缩放胜率曲线（用法：拧 MapConfig.enemy_scale 后看曲线是否合理下降）──────
+# 固定 build 打"第 N 层缩放后的怪"，胜率应随深度下降 → 证明 ramp 生效、且能量化调参。
+func test_depth_scaling_curve() -> void:
+	var s: Dictionary = MapConfig.DEFAULT["enemy_scale"]
+	gut.p("===== 深度缩放胜率曲线（每层缩放怪各打 %d 次）=====" % TRIALS)
+	gut.p("层    好build   中庸build")
+	for layer in [1, 5, 10, 15, 20, 30]:
+		var g := _scaled_winrate(_good_grids(), ["bandit", "ranger"], layer, s)
+		var o := _scaled_winrate(_ok_grids(), ["bandit", "ranger"], layer, s)
+		gut.p("  %2d   %d/%d     %d/%d" % [layer, g, TRIALS, o, TRIALS])
+	# 软断言：中庸 build 深层应明显比浅层难（ramp 确实在加压）
+	var shallow := _scaled_winrate(_ok_grids(), ["bandit", "ranger"], 1, s)
+	var deep := _scaled_winrate(_ok_grids(), ["bandit", "ranger"], 30, s)
+	assert_lte(deep, shallow, "同一中庸 build：第30层胜率 ≤ 第1层（越深越难）")
+
+# 固定 build 打"缩放到第 layer 层"的一组怪的满血胜率
+func _scaled_winrate(grids: Array, group_ids: Array, layer: int, scale_cfg: Dictionary) -> int:
+	var wins := 0
+	for t in range(TRIALS):
+		var enemies: Array = MonsterFactory.create_group(group_ids)
+		for e in enemies:
+			MapGenerator.scale_enemy(e, layer, scale_cfg)
+		var tm: Dictionary = _team(grids)
+		var party: Party = Loadout.build_party(tm["loadouts"], tm["slots"], true)
+		if BattleSimulator.simulate(party, enemies).party_won:
+			wins += 1
+	return wins
 
 
 func test_good_build_beats_bad_build() -> void:

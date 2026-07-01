@@ -127,11 +127,12 @@ static func _weighted_type(spawnable: Array, type_cfg: Dictionary, layer: int,
 
 static func _fill_content(n: Dictionary, config: Dictionary, rng: RandomNumberGenerator) -> void:
 	var t: String = n["type"]
+	var layer: int = int(n["layer"])
 	var names: Dictionary = config.get("names", {})
 	var gold: Dictionary = config.get("gold", {})
 	match t:
 		"village":
-			n["name"] = "营地" if int(n["layer"]) == 0 else _pick_name(names, "village", rng, "村镇")
+			n["name"] = "营地" if layer == 0 else _pick_name(names, "village", rng, "村镇")
 		"rest":
 			n["name"] = _pick_name(names, "rest", rng, "泉水")
 		"event":
@@ -142,12 +143,39 @@ static func _fill_content(n: Dictionary, config: Dictionary, rng: RandomNumberGe
 			n["gold"] = int(gold.get("boss", 100))
 		"elite":
 			n["name"] = _pick_name(names, "elite", rng, "精英战")
-			n["enemies"] = MonsterFactory.create_group(_pick(config.get("elite_groups", []), rng))
+			n["enemies"] = MonsterFactory.create_group(_pick_group(config.get("elite_tiers", []), layer, rng))
 			n["gold"] = int(gold.get("elite", 45))
 		_:  # battle（含未知类型兜底）
 			n["name"] = _pick_name(names, "battle", rng, "遭遇")
-			n["enemies"] = MonsterFactory.create_group(_pick(config.get("battle_groups", []), rng))
+			n["enemies"] = MonsterFactory.create_group(_pick_group(config.get("battle_tiers", []), layer, rng))
 			n["gold"] = int(gold.get("battle", 20))
+
+	# 深度缩放（统一在最后应用；boss 等 skip_types 跳过、总开关关则不缩放）
+	apply_depth_scale(n["enemies"], layer, t, config)
+
+
+# ── 深度缩放 ─────────────────────────────────────────────────────────────────
+
+## 给一组怪按层数缩放（生成器 + 平衡 harness 复用）。
+## 总开关关 / 类型在 skip_types → 原样不动。
+static func apply_depth_scale(enemies: Array, layer: int, type: String, config: Dictionary) -> void:
+	var s: Dictionary = config.get("enemy_scale", {})
+	if not bool(s.get("enabled", false)):
+		return
+	if type in (s.get("skip_types", []) as Array):
+		return
+	for e in enemies:
+		scale_enemy(e, layer, s)
+
+## 缩放单只怪：血/攻/魔按 atk 系数、防按 def 系数（各系数 0 = 该属性不缩放）。
+static func scale_enemy(e: EnemyData, layer: int, s: Dictionary) -> void:
+	var f_hp: float = 1.0 + layer * float(s.get("hp_per_layer", 0.0))
+	var f_atk: float = 1.0 + layer * float(s.get("atk_per_layer", 0.0))
+	var f_def: float = 1.0 + layer * float(s.get("def_per_layer", 0.0))
+	e.base_max_hp = int(round(e.base_max_hp * f_hp))
+	e.base_attack = int(round(e.base_attack * f_atk))
+	e.base_magic = int(round(e.base_magic * f_atk))     # 魔力随攻一起缩放
+	e.base_defense = int(round(e.base_defense * f_def))
 
 
 # ── 小工具 ───────────────────────────────────────────────────────────────────
@@ -174,6 +202,15 @@ static func _pick(arr: Array, rng: RandomNumberGenerator):
 	if arr.is_empty():
 		return []
 	return arr[rng.randi_range(0, arr.size() - 1)]
+
+## 按层数从分档池挑一组怪：取第一个 max_layer≥layer 的档，随机一组（都不匹配则用最后一档）。
+static func _pick_group(tiers: Array, layer: int, rng: RandomNumberGenerator):
+	for tier in tiers:
+		if layer <= int(tier.get("max_layer", 999)):
+			return _pick(tier.get("groups", []), rng)
+	if not tiers.is_empty():
+		return _pick((tiers.back() as Dictionary).get("groups", []), rng)
+	return []
 
 static func _pick_name(names: Dictionary, key: String, rng: RandomNumberGenerator, fallback: String) -> String:
 	var pool = names.get(key, [])

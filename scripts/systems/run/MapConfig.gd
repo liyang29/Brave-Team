@@ -35,17 +35,30 @@ const DEFAULT: Dictionary = {
 
 	# ── 内容池（数据驱动；加遭遇 = 加一行）──────────────────────────────────
 	# 怪物 id 见 MonsterFactory.ENEMIES。
-	"battle_groups": [
-		["wolf", "wolf"],
-		["venom_bug", "stone_guard"],
-		["bandit", "ranger"],
-		["wolf", "bandit"],
+	# ── 分档怪池：按节点所在层选对应档（第一个 max_layer≥层 的档）──────────────
+	# 加档/加怪 = 往对应档 groups 加一行；后期档想有质变就加新怪到 MonsterFactory。
+	"battle_tiers": [
+		{ "max_layer": 3,   "groups": [ ["wolf", "wolf"], ["venom_bug", "wolf"] ] },
+		{ "max_layer": 6,   "groups": [ ["venom_bug", "stone_guard"], ["wolf", "bandit"] ] },
+		{ "max_layer": 999, "groups": [ ["bandit", "ranger"], ["stone_guard", "bandit"] ] },
 	],
-	"elite_groups": [
-		["stone_guard", "bandit"],
-		["bandit", "ranger", "wolf"],
+	"elite_tiers": [
+		{ "max_layer": 5,   "groups": [ ["stone_guard", "bandit"] ] },
+		{ "max_layer": 999, "groups": [ ["bandit", "ranger", "wolf"], ["stone_guard", "stone_guard"] ] },
 	],
 	"boss_group": ["demon_lord", "claw_minion"],
+
+	# ── 深度缩放：第 N 层的怪按系数放大属性（数值 ramp）──────────────────────────
+	# enabled=总开关（false=整体关掉）；各 *_per_layer=每层增幅（0=该属性不缩放，即"关掉这一样"）。
+	# skip_types=不吃缩放的节点类型（魔王手调终点门槛，不按层缩放）。
+	# 第 N 层某属性 = 基础 × (1 + N × 该系数)。防御默认小幅（缩太多会让战斗变拖）。
+	"enemy_scale": {
+		"enabled": true,
+		"hp_per_layer": 0.05,
+		"atk_per_layer": 0.04,
+		"def_per_layer": 0.02,
+		"skip_types": ["boss"],
+	},
 
 	# 各类型金币奖励
 	"gold": { "battle": 20, "elite": 45, "boss": 100 },

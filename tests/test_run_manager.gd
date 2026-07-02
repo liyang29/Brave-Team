@@ -243,6 +243,33 @@ func test_boss_win_skips_draft_to_victory() -> void:
 	assert_true(RunManager.pending_draft.is_empty(), "魔王不产生 draft")
 
 
+# ── 阵亡英雄自动腾出站位格（随葬品：装备/roster 不动，只清 squad_slots）───────
+
+func test_resolve_encounter_vacates_dead_hero_squad_slot() -> void:
+	_goto_type("battle")
+	_seed_team()
+	var mage = RunManager.roster[1]["hero"]
+	var result := BattleResult.victory([], [mage], {}, [], 3)
+	RunManager.resolve_encounter(true, result)
+	assert_false(RunManager.squad_slots.has(Vector2i(0, 1)), "阵亡法师的站位格被自动清空")
+	assert_eq(RunManager.squad_slots.get(Vector2i(0, 0)), RunManager.roster[0]["hero"], "存活战士的站位格不受影响")
+	assert_true(mage in RunManager.roster.map(func(e): return e["hero"]), "阵亡英雄仍留在 roster（永久死亡=标记不删除）")
+
+func test_resolve_encounter_no_dead_heroes_keeps_squad_slots() -> void:
+	_goto_type("battle")
+	_seed_team()
+	var before: Dictionary = RunManager.squad_slots.duplicate()
+	RunManager.resolve_encounter(true, BattleResult.victory([], [], {}, [], 3))
+	assert_eq(RunManager.squad_slots, before, "无人阵亡 → 站位格原样不动")
+
+func test_resolve_encounter_without_result_does_not_crash() -> void:
+	# 兼容旧调用（result 缺省 null，见其它测试如 test_loss_is_game_over）：不该报错
+	_goto_type("battle")
+	_seed_team()
+	RunManager.resolve_encounter(true)
+	assert_eq(RunManager.state, RunManager.State.DRAFT, "result=null 时仍正常走完流程")
+
+
 # ── 村庄（商店 + 招募合一）────────────────────────────────────────────────────
 
 func test_enter_village_state_and_offers() -> void:

@@ -386,6 +386,8 @@ func _place_in_empty_slot(hero) -> void:
 ##   普通/精英胜 → 拿钱 + 抽 3 件战利品进入 DRAFT（draft 完成后回地图选后继）。
 func resolve_encounter(won: bool, result = null) -> void:
 	last_result = result
+	if result != null:
+		_vacate_dead_from_squad(result.dead_heroes)
 	if not won:
 		_set_state(State.GAME_OVER)
 		return
@@ -395,6 +397,14 @@ func resolve_encounter(won: bool, result = null) -> void:
 		return
 	pending_draft = LootTable.draw_draft(3, current_layer())
 	_set_state(State.DRAFT)
+
+
+## 阵亡英雄自动腾出站位格（活人不用先把尸体换到别处才能补位）；装备/背包留在她身上不动
+## （"随葬品"——阵亡永久，不退回公共栏，roster 也不删她，只是不再占战位）。
+func _vacate_dead_from_squad(dead_heroes: Array) -> void:
+	for cell in squad_slots.keys():
+		if squad_slots[cell] in dead_heroes:
+			squad_slots.erase(cell)
 
 
 ## 战利品 draft 结束：留下的物品进库存 → 回地图选后继。

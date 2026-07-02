@@ -39,6 +39,10 @@ func _ready() -> void:
 func _grid() -> Dictionary:
 	return panel._roster[hero_index]["grid"]
 
+## 阵亡英雄的背包锁编辑（随葬品：能看不能动，见 RunManager._vacate_dead_from_squad 的同一决策）。
+func _is_locked() -> bool:
+	return not panel._roster[hero_index]["hero"].is_alive()
+
 
 # ── 坐标 <-> 格子 ─────────────────────────────────────────────────────────────
 
@@ -101,6 +105,8 @@ func _bounding_box(cells: Array) -> Rect2:
 # ── Godot 原生拖放 ────────────────────────────────────────────────────────────
 
 func _get_drag_data(at_position: Vector2) -> Variant:
+	if _is_locked():
+		return null
 	# 找鼠标所在格属于哪件物品 → 抓它整件（锚点）
 	var cell := _cell_at(at_position)
 	var occ: Dictionary = Backpack.occupied_cells(_grid())
@@ -118,6 +124,8 @@ func _get_drag_data(at_position: Vector2) -> Variant:
 
 
 func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	if _is_locked():
+		return false
 	if not (data is Dictionary) or data.get("type", "") != "item":
 		return false
 	var anchor := _cell_at(at_position)

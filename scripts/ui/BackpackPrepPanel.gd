@@ -121,11 +121,14 @@ func _build_squad_board() -> Control:
 
 func _build_hero_panel(index: int) -> Control:
 	var entry: Dictionary = _roster[index]
+	var dead: bool = not entry["hero"].is_alive()
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
+	if dead:
+		box.modulate = Color(0.5, 0.5, 0.5)   # 整块变灰（含背包/属性文字），跟 HP 列表统一视觉语言
 
 	var head := Label.new()
-	head.text = entry["hero"].entity_name
+	head.text = entry["hero"].entity_name + ("（阵亡）" if dead else "")
 	head.add_theme_font_size_override("font_size", 16)
 	box.add_child(head)
 

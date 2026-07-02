@@ -1,23 +1,24 @@
 extends PanelContainer
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DragSlot — 可拖放槽位（背包格 / 站位格 / 公共装备栏格 共用）
+# DragSlot — 可拖放槽位（站位格 / 丢弃桶 / 卖出格 共用；背包格+驮兽格已改用 BagGridView）
 #
-# 实现 Godot 原生拖放三虚函数，把"取出/能否放/放下"委托给 BackpackPrepPanel：
+# 实现 Godot 原生拖放三虚函数，把"取出/能否放/放下"委托给宿主 panel（BackpackPrepPanel
+# 或 MulePanel，二者都实现同名回调）：
 #   _get_drag_data  → panel.grab_payload(kind, key)
 #   _can_drop_data  → panel.can_accept(kind, key, data)
 #   _drop_data      → panel.handle_drop(kind, key, data)
 #
-# kind: "bag"（背包格）/ "squad"（站位格）/ "pool"（公共装备栏格）
-# key : bag → { "hero_index": int, "cell": Vector2i }；squad → Vector2i；pool → item_id(String)
+# kind: "squad"（站位格）/ "trash"（丢弃桶，只接收不产出）/ "sell"（卖出格，仅 MulePanel 用）
+# key : squad → Vector2i；trash/sell → null（不区分具体格子，宿主直接按 data 里的 src 处理）
 # ─────────────────────────────────────────────────────────────────────────────
 
-var panel              # BackpackPrepPanel
+var panel              # BackpackPrepPanel 或 MulePanel
 var kind: String = ""
 var key
 
 var _label: Label
-var _badge: Label      # 右下角数量角标（公共装备栏用）
+var _badge: Label      # 右下角数量角标（历史遗留：现无使用方，保留字段避免破坏 set_display 签名）
 
 
 func _ready() -> void:

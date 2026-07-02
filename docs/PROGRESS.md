@@ -20,7 +20,8 @@
 - **玩家目标优先级策略按钮**（安全阀）：集火残血 / 点后排威胁 / 打高攻 / 各自本能。战前设、自动执行；保持轻量，别做成 FF12 Gambit。先治本 AI 再视情加。
 - **敌方 spellcaster 名副其实**：`enemy_spell` 目前是占位（不在 SkillTable → 回退普攻）；给它配真魔法技能（use_magic）。
 - 站位"前→后排"数值：当前 ×0.7（两修正叠乘）；世界树原版 ×0.5（满伤仅前→前）。待玩后定。
-- 公共驮兽（共享后勤背包，战斗中不可掏、有代价）、负重、金币经济、更多副属性（法抗/吸血/破甲…见 stats 目录）、技能书参与邻接协同。
+- ~~公共驮兽（共享后勤背包）~~ **已做**（见下方"驮兽仓库"条目，2026-07-03）：空间化 6×6，未做的是"战斗中不可掏、有代价"这层战斗限制（现在跟战前一样能自由取用）。
+- 负重（跟驮兽格子数是两个概念，格子=空间取舍，负重=数量/重量取舍，两者可以并存）、金币经济、更多副属性（法抗/吸血/破甲…见 stats 目录）、技能书参与邻接协同。
 
 ## 🎯 roguelike 跑局骨架
 
@@ -54,6 +55,7 @@
 - [x] **手动限定招募池开关（跟 meta 解锁分层，纯玩法调节）**：`RunManager.RECRUIT_POOL_OVERRIDE`（`var`，非 `const`）——留空 `[]` = 默认行为(招募池=已解锁职业)；填了 id(如 `["warrior","mage","priest"]`) 就只从这些里抽，哪怕其它职业已经 meta 解锁也不出现。跟 `MetaProgress` 存档完全独立，改这一行随时生效、随时清空恢复，不影响解锁进度。GUT 测试文件 `before_each()` 里显式重置为 `[]`（同 `autosave` 套路），避免这个开关污染"meta 解锁真实生效"的回归测试。
 - [x] **地图自动滚到当前节点（45 层后手动找自己在哪太烦）**：`MapGraphView` 暴露 `current_node_control`（当前节点的静态面板引用）；`RunMap` 建图后据此把 `ScrollContainer.scroll_vertical` 设到"当前节点垂直居中"（算不出/图浅时钳到 0，不滚出界）。纯视觉定位，不改地图数据结构。配 GUT（`test_run_map_scroll` 5 条：定位/深处自动滚/居中量精确对账/浅图钳 0/通关横幅分支不建 scroll）；307/307 绿。
 - [x] **阵亡英雄 prep 界面收口（此前只有 HP 列表变灰，背包/站位没跟上）**：死亡=`current_hp<=0` 的永久标记，`roster` 从不删人——但过去只有 `Encounter.gd`/`RunMap.gd` 的 HP 文字列表处理了这个状态，`BackpackPrepPanel` 的背包搭建面板和站位格完全没查 `is_alive()`，能往尸体背包里白拖东西、尸体还占着站位格挡活人。用你问我答方式定了三件事：① 背包面板变灰+锁编辑（`BackpackPrepPanel._build_hero_panel` 按 `is_alive()` 置灰 + 标"（阵亡）"；`BagGridView._get_drag_data/_can_drop_data` 加 `_is_locked()` 门，阵亡英雄背包既拖不出也拖不进）。② 阵亡自动腾出站位格（`RunManager.resolve_encounter` 新增 `_vacate_dead_from_squad()`，按 `BattleResult.dead_heroes` 清 `squad_slots` 里对应条目，活人不用先手动把尸体换开）。③ 装备**不**退回公共栏——刻意留在遗体背包里当"随葬品"，永久损失，强化真死亡的代价感。配 GUT（`test_run_manager` 3 条 + `test_backpack_prep_panel` 3 条）；313/313 绿，`Encounter.tscn` smoke-load 无报错。
+- [x] **驮兽仓库（公共装备栏空间化，从"预留清单"里落地）**：原来的"公共装备栏"是无限容量的 `{item_id:数量}` 平铺库存；用你问我答方式定了方案——改成 `Backpack.MULE_GRID_W/H=6×6` 空间网格（**先定成这样**，以后升级容量改这两个数字就行），跟英雄背包同一套形状/占格/合成逻辑（`in_bounds/can_place` 泛化出 `w/h` 参数，缺省=英雄背包尺寸，向后兼容；新增 `first_free_anchor/has_room` 给自动放置/容量判定用；`merge_target` 从两处面板脚本各抄一份的重复代码收编成 `BackpackModel` 一个静态函数）。**满了直接拒绝新增**（不做"超载"中间态）：商店按钮驮兽满了会置灰显示"驮兽满"；战利品 draft 是"先选后放"，选中的东西才检查——驮不下的会 best-effort 跳过，`finish_draft` 返回没装下的 id 列表，`DraftScreen` 弹一屏告诉玩家没能带走什么（不静默丢东西）。**丢弃桶**（trash，拖任意物品进去直接消失，`BackpackPrepPanel`/新 `MulePanel` 都有）+ **卖出**（只有村庄的 `MulePanel` 有，`LootTable.sell_price()`=进价五折，色阶合成品按基础 rarity 算不加价，防"买了就卖"套利）。`BagGridView` 泛化出 `kind`("bag"/"mule") + `grid_w/grid_h`，同一个自绘网格控件两处复用；`RunManager.owned_items` 整个改名/改型成 `mule_grid`（`buy_item`/`finish_draft`/事件掉落/`_has_item` 等全部跟着改，`BackpackExperiment.gd` 沙盒的起手种子清单也改成自动打包）。配 GUT（`test_backpack_shapes` 追加 20 条网格函数泛化测试 + `test_backpack_prep_panel` 重写 19 条 + 新 `test_mule_panel` 10 条 + `test_bag_grid_view` 追加 3 条 mule 模式 + `test_run_manager` 追加 8 条容量/卖出/丢弃 + `test_loot_table` 追加 2 条卖价）；353/353 绿，4 个场景 smoke-load 无报错。**未做活体点击验证**——这次改动涉及真实拖放交互，没有用 computer-use 走一遍点击流程，逻辑测试覆盖了所有拖放回调但没验证过实际鼠标拖拽手感，建议玩家实测后反馈。
 - [ ] 平衡（起手队伍数值现为占位；45 层地图 + 3 中程 Boss 的整体经济节奏待后续实测校准）
 
 ## ⭐ 小队跨英雄协同（差异化护城河，详设见 `BUILD_DESIGN.md` §7）

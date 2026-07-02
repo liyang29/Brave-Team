@@ -16,23 +16,23 @@ const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const Prep = preload("res://scripts/ui/BackpackPrepPanel.gd")
 
-# 共享物品池（item_id -> 数量）
-const POOL_DEF: Dictionary = {
-	"iron_sword": 1, "longsword": 1, "whetstone": 1,
-	"shield": 1, "chainmail": 1, "leather": 1,
-	"staff": 1, "tome": 1, "holy_symbol": 1,
-	"amulet": 1, "charm": 1,
+# 起手种子清单（item_id 各 1 件；顺序特意把大件放前面，自动打包进驮兽时更省格子）。
+const SEED_ITEMS: Array = [
+	"iron_sword", "longsword", "whetstone",
+	"shield", "chainmail", "leather",
+	"staff", "tome", "holy_symbol",
+	"amulet", "charm",
 	# 技能书（占格、和装备抢空间；认职业）
-	"book_slash": 1, "book_cleave": 1, "book_taunt": 1,
-	"book_fireball": 1, "book_icelance": 1,
-	"book_heal": 1, "book_purify": 1,
+	"book_slash", "book_cleave", "book_taunt",
+	"book_fireball", "book_icelance",
+	"book_heal", "book_purify",
 	# 副属性物品（暴击 / 闪避 / 嘲讽）
-	"crit_gem": 1, "keen_edge": 1, "berserk_ring": 1,
-	"evasion_cloak": 1, "shadow_mantle": 1, "provoke_charm": 1, "decoy_mask": 1,
-}
+	"crit_gem", "keen_edge", "berserk_ring",
+	"evasion_cloak", "shadow_mantle", "provoke_charm", "decoy_mask",
+]
 
 var _heroes: Array = []        # [{ hero, base:{}, grid:{}, name }]
-var _pool: Dictionary = {}     # item_id -> remaining
+var _mule: Dictionary = {}     # 驮兽仓库：{ Vector2i(锚点): item_id }，6×6，跟真实跑局同一套逻辑
 var _squad_slots: Dictionary = {}
 
 var _prep                      # BackpackPrepPanel
@@ -43,8 +43,18 @@ var _log_label: RichTextLabel
 func _ready() -> void:
 	_build_heroes()
 	_place_default_formation()
-	_pool = POOL_DEF.duplicate()
+	_mule = _pack_seed_items(SEED_ITEMS)
 	_build_ui()
+
+
+## 把起手种子清单自动打包进空驮兽（贪心，先到先放；装不下的就少给，纯沙盒默认值不严格）。
+func _pack_seed_items(ids: Array) -> Dictionary:
+	var mule: Dictionary = {}
+	for id in ids:
+		var anchor: Vector2i = Backpack.first_free_anchor(mule, id, Backpack.MULE_GRID_W, Backpack.MULE_GRID_H)
+		if anchor != Vector2i(-1, -1):
+			mule[anchor] = id
+	return mule
 
 
 # 默认站位：战士前排，法师/牧师后排（玩家可自行调整）
@@ -122,7 +132,7 @@ func _build_ui() -> void:
 	# 共享编辑组件
 	_prep = Prep.new()
 	root.add_child(_prep)
-	_prep.setup(_heroes, _pool, _squad_slots)
+	_prep.setup(_heroes, _mule, _squad_slots)
 
 	root.add_child(HSeparator.new())
 
@@ -135,7 +145,7 @@ func _build_ui() -> void:
 	btns.add_child(fight_btn)
 	var clear_btn: Button = Button.new()
 	clear_btn.text = "全部取回"
-	clear_btn.pressed.connect(func(): _prep.return_all_to_pool())
+	clear_btn.pressed.connect(func(): _prep.return_all_to_mule())
 	btns.add_child(clear_btn)
 	root.add_child(btns)
 

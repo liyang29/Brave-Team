@@ -165,6 +165,12 @@ static func merge_result(item_id: String) -> String:
 const GRID_W := 4
 const GRID_H := 4
 
+# 驮兽仓库（公共装备栏的空间化版本）：独立一套宽高，跟英雄背包共用同一套形状/占格逻辑
+# （in_bounds/can_place 都吃 w/h 参数，缺省=英雄背包尺寸，向后兼容）。"先定成这样"——
+# 以后要升级容量，改这两个数字就是了，不用碰下面的网格算法。
+const MULE_GRID_W := 6
+const MULE_GRID_H := 6
+
 const SHAPES: Dictionary = {
 	"1x1":  [Vector2i(0, 0)],
 	"1x2h": [Vector2i(0, 0), Vector2i(1, 0)],                   # 横 1×2
@@ -189,9 +195,9 @@ static func item_cells(item_id: String, anchor: Vector2i) -> Array:
 		out.append(anchor + off)
 	return out
 
-## 格子是否在 GRID_W×GRID_H 界内。
-static func in_bounds(cell: Vector2i) -> bool:
-	return cell.x >= 0 and cell.x < GRID_W and cell.y >= 0 and cell.y < GRID_H
+## 格子是否在 w×h 界内（缺省英雄背包尺寸；驮兽仓库传 MULE_GRID_W/H）。
+static func in_bounds(cell: Vector2i, w: int = GRID_W, h: int = GRID_H) -> bool:
+	return cell.x >= 0 and cell.x < w and cell.y >= 0 and cell.y < h
 
 ## grid 的占用图 { 格子 -> 锚点 }。ignore_anchor 可排除某件（拖动它自己时用）。
 static func occupied_cells(grid: Dictionary, ignore_anchor = null) -> Dictionary:
@@ -205,12 +211,41 @@ static func occupied_cells(grid: Dictionary, ignore_anchor = null) -> Dictionary
 
 ## 能否把 item_id 放到 anchor：所有占用格都在界内且不与别件重叠。
 ## ignore_anchor：移动某件到新位时排除它自身原占用（否则会与自己冲突）。
-static func can_place(grid: Dictionary, item_id: String, anchor: Vector2i, ignore_anchor = null) -> bool:
+static func can_place(grid: Dictionary, item_id: String, anchor: Vector2i, ignore_anchor = null,
+		w: int = GRID_W, h: int = GRID_H) -> bool:
 	var occ: Dictionary = occupied_cells(grid, ignore_anchor)
 	for c in item_cells(item_id, anchor):
-		if not in_bounds(c) or occ.has(c):
+		if not in_bounds(c, w, h) or occ.has(c):
 			return false
 	return true
+
+## 在 w×h 网格里从左上到右下扫，找第一个放得下 item_id 的锚点；找不到返回 Vector2i(-1,-1)。
+## 自动放置用（商店购买/战利品拾取/仓库整理一键归位），玩家手动拖放走 can_place 精确落点。
+static func first_free_anchor(grid: Dictionary, item_id: String, w: int = GRID_W, h: int = GRID_H) -> Vector2i:
+	for y in range(h):
+		for x in range(w):
+			var anchor := Vector2i(x, y)
+			if can_place(grid, item_id, anchor, null, w, h):
+				return anchor
+	return Vector2i(-1, -1)
+
+## 该网格还有没有地方放得下这件（容量判定：商店/拾取按钮置灰用）。
+static func has_room(grid: Dictionary, item_id: String, w: int = GRID_W, h: int = GRID_H) -> bool:
+	return first_free_anchor(grid, item_id, w, h) != Vector2i(-1, -1)
+
+## 落点若压在"同基础同色阶、可合成"的现有物品上，返回该物品的锚点（合成目标）；否则 null。
+## ignore：拖动物品自身原占用的锚点（同网格内移动时排除，不跟自己合成）。
+## 英雄背包/驮兽仓库的拖放合成判定共用这一个函数（原逻辑曾在两处面板脚本各抄一份）。
+static func merge_target(dest_grid: Dictionary, item_id: String, anchor: Vector2i, ignore = null):
+	var occ_anchor = occupied_cells(dest_grid).get(anchor)
+	if occ_anchor == null or occ_anchor == ignore:
+		return null
+	var existing_id: String = dest_grid[occ_anchor]
+	if base_id(existing_id) != base_id(item_id) or item_tier(existing_id) != item_tier(item_id):
+		return null
+	if merge_result(item_id) == "":
+		return null
+	return occ_anchor
 
 
 # ── 邻接协同规则 ──────────────────────────────────────────────────────────────

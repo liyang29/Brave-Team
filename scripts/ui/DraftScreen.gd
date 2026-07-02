@@ -86,5 +86,34 @@ func _on_discard(discarded: String, draft: Array) -> void:
 			skipped = true   # 只丢一件（即便重复也只丢一个，但同抽不会重复）
 			continue
 		kept.append(id)
-	RunManager.finish_draft(kept)
-	get_tree().change_scene_to_file(SCENE_MAP)
+	var overflow: Array = RunManager.finish_draft(kept)
+	if overflow.is_empty():
+		get_tree().change_scene_to_file(SCENE_MAP)
+	else:
+		_show_overflow_notice(overflow)
+
+
+## 驮兽装不下时才会走到这——留下的东西没能全带走，告诉玩家一声再回地图（不静默丢东西）。
+func _show_overflow_notice(overflow: Array) -> void:
+	for c in get_children():
+		remove_child(c)
+		c.free()
+	var root := VBoxContainer.new()
+	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 12)
+	root.offset_left = 40; root.offset_top = 30; root.offset_right = -40; root.offset_bottom = -30
+	add_child(root)
+
+	var names: Array = overflow.map(func(id): return Backpack.item_name(id))
+	var msg := RichTextLabel.new()
+	msg.bbcode_enabled = true
+	msg.fit_content = true
+	msg.add_theme_font_size_override("normal_font_size", 20)
+	msg.text = "[color=orange]驮兽仓库装不下了[/color]\n没能带走：%s\n（去驮兽仓库丢弃/卖掉点东西腾地方，下次就能拿了）" % ", ".join(names)
+	root.add_child(msg)
+
+	var btn := Button.new()
+	btn.text = "知道了 ▶"
+	btn.custom_minimum_size = Vector2(160, 40)
+	btn.pressed.connect(func(): get_tree().change_scene_to_file(SCENE_MAP))
+	root.add_child(btn)

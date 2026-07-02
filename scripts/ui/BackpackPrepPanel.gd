@@ -3,14 +3,16 @@ extends VBoxContainer
 # ─────────────────────────────────────────────────────────────────────────────
 # BackpackPrepPanel — 背包/站位编辑组件（背包实验 + 跑局遭遇 prep 共用）
 #
-# 拖放交互（Godot 原生拖放，经 DragSlot 委托回本面板）：
-#   公共装备栏(pool) ↔ 背包格(bag) ↔ 背包格：拖物品（放到占用格=交换）
+# 拖放交互（Godot 原生拖放，经 DragSlot/BagGridView 委托回本面板）：
+#   驮兽仓库(mule) ↔ 背包格(bag) ↔ 背包格：拖物品（放到占用格=交换/同款同色阶=合成）
+#   任意物品 → 丢弃桶(trash)：直接消失，腾地方
 #   站位格(squad) ↔ 站位格：拖英雄（放到占用格=交换）
-#   物品只能进 bag/pool；英雄只能进 squad（载荷带 type 防错放）。
+#   物品只能进 bag/mule/trash；英雄只能进 squad（载荷带 type 防错放）。
 #
-# 只负责"编辑"；开战/结果留给宿主。按引用操作宿主的 roster/owned_items/squad_slots。
-#   roster      : Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]
-#   owned_items : { item_id: 数量 }（公共装备栏库存；数量到 0 自动移除该格）
+# 只负责"编辑"；开战/结果留给宿主。按引用操作宿主的 roster/mule_grid/squad_slots。
+#   roster    : Array[{ "hero": Hero, "base": Dictionary, "grid": Dictionary }]
+#   mule_grid : { Vector2i(锚点): item_id }（驮兽仓库，跟英雄 grid 同一套空间逻辑，
+#                见 Backpack.MULE_GRID_W/H；卖出只能在村庄，见 MulePanel）
 #   squad_slots : { Vector2i(col,row): Hero }  row0 前排 / row1 后排
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,23 +23,27 @@ const BagGridView = preload("res://scripts/ui/BagGridView.gd")
 
 # 注入状态（引用宿主对象）
 var _roster: Array = []
-var _pool: Dictionary = {}
+var _mule: Dictionary = {}
 var _squad_slots: Dictionary = {}
 
 # UI 节点引用
-var _pool_box: HFlowContainer
+var _mule_view: BagGridView
 var _squad_ui: Dictionary = {}     # Vector2i -> DragSlot
 var _bag_views: Array = []         # 每英雄一个 BagGridView（自绘 4×4 多格背包）
 var _stat_labels: Array = []       # 每英雄一个 Label
 
 
-func setup(roster: Array, owned_items: Dictionary, squad_slots: Dictionary) -> void:
+func setup(roster: Array, mule_grid: Dictionary, squad_slots: Dictionary) -> void:
 	_roster = roster
-	_pool = owned_items
+	_mule = mule_grid
 	_squad_slots = squad_slots
 	add_theme_constant_override("separation", 8)
 	_build_ui()
 	refresh()
+
+## 供 BagGridView(kind="mule") 读——驮兽仓库的原始 Dictionary 引用。
+func mule_grid_ref() -> Dictionary:
+	return _mule
 
 
 # ── 给宿主用的校验/操作助手 ───────────────────────────────────────────────────
@@ -54,22 +60,37 @@ func any_item_placed() -> bool:
 			return true
 	return false
 
-func return_all_to_pool() -> void:
+## 把所有英雄背包里的东西尽量挪回驮兽（驮兽装不下的那件留在原背包不动——不会凭空消失）。
+func return_all_to_mule() -> void:
 	for entry in _roster:
 		var grid: Dictionary = entry["grid"]
-		for cell in grid.keys():
-			_owned_add(grid[cell], 1)
-		grid.clear()
+		for cell in grid.keys().duplicate():
+			var anchor: Vector2i = Backpack.first_free_anchor(_mule, grid[cell], Backpack.MULE_GRID_W, Backpack.MULE_GRID_H)
+			if anchor == Vector2i(-1, -1):
+				continue   # 驮兽满了，这件留在背包里
+			_mule[anchor] = grid[cell]
+			grid.erase(cell)
 	refresh()
 
 
 # ── UI 构建 ───────────────────────────────────────────────────────────────────
 
 func _build_ui() -> void:
-	add_child(_section("公共装备栏（拖到下面某人背包格；空着的格子从背包拖回来）"))
-	_pool_box = HFlowContainer.new()
-	_pool_box.custom_minimum_size = Vector2(700, 0)
-	add_child(_pool_box)
+	add_child(_section("驮兽仓库（%d×%d 空间背包 · 拖到下面某人背包格装备；装满了先在这丢弃/去村庄卖）" %
+		[Backpack.MULE_GRID_W, Backpack.MULE_GRID_H]))
+	var mule_row := HBoxContainer.new()
+	mule_row.add_theme_constant_override("separation", 12)
+	_mule_view = BagGridView.new()
+	_mule_view.panel = self
+	_mule_view.kind = "mule"
+	_mule_view.grid_w = Backpack.MULE_GRID_W
+	_mule_view.grid_h = Backpack.MULE_GRID_H
+	mule_row.add_child(_mule_view)
+	var trash := _new_slot("trash", null, Vector2(72, 72))
+	trash.set_display("🗑丢弃", Color(0.85, 0.55, 0.55))
+	trash.tooltip_text = "把任意物品拖到这丢弃，直接消失、不进任何背包（腾地方用）"
+	mule_row.add_child(trash)
+	add_child(mule_row)
 
 	add_child(_section("队伍站位（直接把人拖到另一格 · 前排挨打、后排被保护）"))
 	add_child(_build_squad_board())
@@ -150,7 +171,7 @@ func _build_hero_panel(index: int) -> Control:
 # ── 刷新 ──────────────────────────────────────────────────────────────────────
 
 func refresh() -> void:
-	_rebuild_pool()
+	_mule_view.queue_redraw()
 	# 全队最终属性（含光环），与开战时一致——保证"看到的=打出来的"
 	var squad: Array = Loadout.squad_stats(_roster, _squad_slots)
 	for i in range(_roster.size()):
@@ -162,36 +183,6 @@ func refresh() -> void:
 			_squad_ui[cell].set_display(h.entity_name, Color(0.75, 1.0, 0.75))
 		else:
 			_squad_ui[cell].set_display("·", Color(1, 1, 1))
-
-
-func _rebuild_pool() -> void:
-	for c in _pool_box.get_children():
-		_pool_box.remove_child(c)
-		c.free()
-	var ids: Array = _pool.keys()
-	ids.sort()
-	for item_id in ids:
-		var n: int = int(_pool.get(item_id, 0))
-		if n <= 0:
-			continue
-		var entry_box := HBoxContainer.new()
-		entry_box.add_theme_constant_override("separation", 2)
-		var slot := _new_slot("pool", item_id, Vector2(110, 44))
-		slot.set_display(Backpack.item_name(item_id), Backpack.tier_color(Backpack.item_tier(item_id)), "×%d" % n)
-		slot.tooltip_text = Backpack.item_tooltip(item_id)
-		entry_box.add_child(slot)
-		if n >= 2 and Backpack.is_mergeable(item_id):
-			var result: String = Backpack.merge_result(item_id)
-			if result != "":
-				var merge_btn := Button.new()
-				merge_btn.text = "⇪合成"
-				merge_btn.custom_minimum_size = Vector2(56, 44)
-				merge_btn.tooltip_text = "消耗 2 件 → 合成 1 件 %s" % Backpack.item_name(result)
-				merge_btn.pressed.connect(func():
-					merge_pool_item(item_id)
-					refresh())
-				entry_box.add_child(merge_btn)
-		_pool_box.add_child(entry_box)
 
 
 func _stat_text(entry: Dictionary, fs: Dictionary) -> String:
@@ -236,11 +227,12 @@ func grab_payload(kind: String, key) -> Variant:
 				return null
 			return { "type": "item", "id": grid[c], "label": Backpack.item_name(grid[c]),
 					"src": { "kind": "bag", "hero_index": key["hero_index"], "cell": c } }
-		"pool":
-			if int(_pool.get(key, 0)) <= 0:
+		"mule":
+			var anchor: Vector2i = key
+			if not _mule.has(anchor):
 				return null
-			return { "type": "item", "id": key, "label": Backpack.item_name(key),
-					"src": { "kind": "pool", "id": key } }
+			return { "type": "item", "id": _mule[anchor], "label": Backpack.item_name(_mule[anchor]),
+					"src": { "kind": "mule", "anchor": anchor } }
 		"squad":
 			var h = _squad_slots.get(key)
 			if h == null:
@@ -249,11 +241,11 @@ func grab_payload(kind: String, key) -> Variant:
 	return null
 
 
-## 目标槽位能否接收该载荷（物品→bag/pool；英雄→squad）。
+## 目标槽位能否接收该载荷（物品→bag/mule/trash；英雄→squad）。
 func can_accept(kind: String, _key, data: Dictionary) -> bool:
 	match data.get("type", ""):
 		"item":
-			return kind == "bag" or kind == "pool"
+			return kind == "bag" or kind == "mule" or kind == "trash"
 		"hero":
 			return kind == "squad"
 	return false
@@ -262,89 +254,70 @@ func can_accept(kind: String, _key, data: Dictionary) -> bool:
 ## 执行放下，然后延迟刷新（避免在拖放回调途中 free 当前槽位而报错）。
 func handle_drop(kind: String, key, data: Dictionary) -> void:
 	if data.get("type", "") == "item":
-		_drop_item(data, kind, key)
+		if kind == "trash":
+			_consume_dragged(data["src"], data["id"])   # 纯消耗，不落进任何地方
+		else:
+			_drop_item(data, kind, key)
 	elif data.get("type", "") == "hero" and kind == "squad":
 		_drop_hero(data, key)
 	call_deferred("refresh")
 
 
-## 背包目标能否接收该物品（BagGridView 算落点幽灵 + 校验用）。
-## 形状感知：锚点处放得下(界内+不重叠) 才行；落在"同基础同色阶可合成"的另一件上 = 合成，
-## 也算可放（预览显示为绿）；同背包移动排除物品自身原占用。
+## 英雄背包目标能否接收该物品（BagGridView 算落点幽灵 + 校验用）。
 func bag_can_drop(hero_index: int, id: String, src: Dictionary, anchor: Vector2i) -> bool:
-	if src.get("kind", "") == "pool" and int(_pool.get(id, 0)) <= 0:
-		return false
 	var dest_grid: Dictionary = _roster[hero_index]["grid"]
 	var ignore = null
 	if src.get("kind", "") == "bag" and int(src.get("hero_index", -1)) == hero_index:
 		ignore = src.get("cell")
-	if _merge_target(dest_grid, id, anchor, ignore) != null:
+	if Backpack.merge_target(dest_grid, id, anchor, ignore) != null:
 		return true
 	return Backpack.can_place(dest_grid, id, anchor, ignore)
 
 
-## 落点若压在"同基础同色阶、可合成"的现有物品上，返回该物品的锚点（合成目标）；否则 null。
-func _merge_target(dest_grid: Dictionary, id: String, anchor: Vector2i, ignore):
-	var occ_anchor = Backpack.occupied_cells(dest_grid).get(anchor)
-	if occ_anchor == null or occ_anchor == ignore:
-		return null
-	var existing_id: String = dest_grid[occ_anchor]
-	if Backpack.base_id(existing_id) != Backpack.base_id(id) or Backpack.item_tier(existing_id) != Backpack.item_tier(id):
-		return null
-	if Backpack.merge_result(id) == "":
-		return null
-	return occ_anchor
+## 驮兽仓库目标能否接收该物品（同 bag_can_drop，网格换成 _mule + 尺寸 6×6）。
+func mule_can_drop(id: String, src: Dictionary, anchor: Vector2i) -> bool:
+	var ignore = null
+	if src.get("kind", "") == "mule":
+		ignore = src.get("anchor")
+	if Backpack.merge_target(_mule, id, anchor, ignore) != null:
+		return true
+	return Backpack.can_place(_mule, id, anchor, ignore, Backpack.MULE_GRID_W, Backpack.MULE_GRID_H)
 
 
 func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
 	var id: String = data["id"]
 	var src: Dictionary = data["src"]
 
-	if dest_kind == "pool":
-		if src["kind"] == "bag":      # 背包 → 库存
-			_roster[src["hero_index"]]["grid"].erase(src["cell"])
-			_owned_add(id, 1)
-		return                        # 库存 → 库存：无操作
+	var dest_grid: Dictionary = _mule if dest_kind == "mule" else _roster[dest_key["hero_index"]]["grid"]
+	var anchor: Vector2i = dest_key if dest_kind == "mule" else dest_key["cell"]
+	var w: int = Backpack.MULE_GRID_W if dest_kind == "mule" else Backpack.GRID_W
+	var h: int = Backpack.MULE_GRID_H if dest_kind == "mule" else Backpack.GRID_H
 
-	# dest_kind == "bag"
-	var hi: int = dest_key["hero_index"]
-	var anchor: Vector2i = dest_key["cell"]
-	var dest_grid: Dictionary = _roster[hi]["grid"]
 	var ignore = null
-	if src["kind"] == "bag" and int(src.get("hero_index", -1)) == hi:
+	if dest_kind == "mule" and src.get("kind", "") == "mule":
+		ignore = src.get("anchor")
+	elif dest_kind == "bag" and src.get("kind", "") == "bag" and int(src.get("hero_index", -1)) == dest_key["hero_index"]:
 		ignore = src.get("cell")
 
 	# 落点是同基础同色阶可合成的物品 → 合成：消耗两件，原地生成高一色阶
-	var merge_anchor = _merge_target(dest_grid, id, anchor, ignore)
+	var merge_anchor = Backpack.merge_target(dest_grid, id, anchor, ignore)
 	if merge_anchor != null:
 		_consume_dragged(src, id)
 		dest_grid[merge_anchor] = Backpack.merge_result(id)
 		return
 
 	# 形状感知：放得下才放，不做交换；放不下则原地不动
-	if not Backpack.can_place(dest_grid, id, anchor, ignore):
-		return                        # 越界/重叠/库存空 → 物品留在原处
+	if not Backpack.can_place(dest_grid, id, anchor, ignore, w, h):
+		return                        # 越界/重叠 → 物品留在原处
 	_consume_dragged(src, id)
 	dest_grid[anchor] = id
 
 
 func _consume_dragged(src: Dictionary, id: String) -> void:
-	if src["kind"] == "pool":         # 库存 → 消耗一件
-		_owned_add(id, -1)
+	if src["kind"] == "mule":         # 驮兽 → 从原位移除
+		_mule.erase(src["anchor"])
 	elif src["kind"] == "bag":        # 背包 → 从原位移除
 		_roster[src["hero_index"]]["grid"].erase(src["cell"])
-
-
-## 库存合成：某物品在库存里 ≥2 件且可合成 → 消耗 2 件、生成 1 件高一色阶。返回是否成功。
-func merge_pool_item(item_id: String) -> bool:
-	if int(_pool.get(item_id, 0)) < 2:
-		return false
-	var result: String = Backpack.merge_result(item_id)
-	if result == "":
-		return false
-	_owned_add(item_id, -2)
-	_owned_add(result, 1)
-	return true
 
 
 func _drop_hero(data: Dictionary, dest_cell: Vector2i) -> void:
@@ -358,11 +331,3 @@ func _drop_hero(data: Dictionary, dest_cell: Vector2i) -> void:
 	else:
 		_squad_slots.erase(src_cell)        # 移动到空格
 	_squad_slots[dest_cell] = moving
-
-
-func _owned_add(id: String, delta: int) -> void:
-	var n: int = int(_pool.get(id, 0)) + delta
-	if n <= 0:
-		_pool.erase(id)
-	else:
-		_pool[id] = n

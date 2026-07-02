@@ -58,7 +58,7 @@ func _ready() -> void:
 	root.add_child(_section("战前准备：搭背包 + 摆站位"))
 	_prep = Prep.new()
 	root.add_child(_prep)
-	_prep.setup(RunManager.roster, RunManager.owned_items, RunManager.squad_slots)
+	_prep.setup(RunManager.roster, RunManager.mule_grid, RunManager.squad_slots)
 
 	root.add_child(HSeparator.new())
 

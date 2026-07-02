@@ -95,9 +95,9 @@ func test_require_item_checks_inventory_and_bags() -> void:
 	_party(["warrior"])
 	RunManager.current_event = "blacksmith_relic"   # 选项0 需铁剑
 	assert_false(RunManager.event_choice_available(0), "无铁剑 → 灰掉")
-	RunManager.owned_items["iron_sword"] = 1
-	assert_true(RunManager.event_choice_available(0), "库存有铁剑 → 可选")
-	RunManager.owned_items.erase("iron_sword")
+	RunManager.mule_grid[Vector2i(0, 0)] = "iron_sword"
+	assert_true(RunManager.event_choice_available(0), "驮兽有铁剑 → 可选")
+	RunManager.mule_grid.erase(Vector2i(0, 0))
 	RunManager.roster[0]["grid"][Vector2i(0, 0)] = "iron_sword"
 	assert_true(RunManager.event_choice_available(0), "背包里有铁剑也算")
 
@@ -115,7 +115,7 @@ func test_effect_gold_clamped() -> void:
 func test_effect_item_to_inventory() -> void:
 	RunManager.start_run()
 	RunManager._apply_event_effect({ "type": "item", "id": "leather" })
-	assert_eq(int(RunManager.owned_items.get("leather", 0)), 1, "物品进库存")
+	assert_true("leather" in RunManager.mule_grid.values(), "物品进驮兽")
 
 func test_effect_hp_pct_heal_and_damage_clamped() -> void:
 	RunManager.start_run()

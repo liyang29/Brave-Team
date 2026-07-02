@@ -46,6 +46,14 @@ static func rarity_of(item_id: String) -> String:
 static func price(item_id: String) -> int:
 	return int(RARITY_PRICES.get(rarity_of(item_id), RARITY_PRICES["common"]))
 
+# 驮兽仓库在村庄卖出的价格 = 进价打五折（防"买了就卖"套利刷钱）；跟 price() 同理，
+# 色阶不影响——rarity_of 已经剥了 "@N" 后缀，合成品跟基础同价。
+const SELL_RATE := 0.5
+
+## 物品卖出价（进价五折，向下取整不亏系统）。
+static func sell_price(item_id: String) -> int:
+	return int(price(item_id) * SELL_RATE)
+
 
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
 ## 掉落色阶三条路：fixed_tier 机制类物品固定色阶（不参与合成）；mergeable 物品按层数

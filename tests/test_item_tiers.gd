@@ -213,72 +213,69 @@ func test_price_unaffected_by_tier() -> void:
 	assert_eq(LootTable.price("iron_sword"), LootTable.price("iron_sword@3"), "售价只看 rarity，不看色阶")
 
 
-# ── BackpackPrepPanel：库存合成 + 背包内拖拽合成 ──────────────────────────────
+# ── BackpackPrepPanel：驮兽仓库内合成 + 背包内拖拽合成 ─────────────────────────
+# （合成只有一条路：拖同款同色阶物品叠上去；旧版"⇪合成"按钮已随 pool 空间化下线）
 
 func _warrior_entry() -> Dictionary:
 	var h: Hero = HeroFactory.create(Hero.HeroClass.WARRIOR)
 	h.entity_name = "战士"
 	return { "hero": h, "base": { "hp": 90, "atk": 6, "def": 8, "magic": 0, "spd": 9, "mp": 40 }, "grid": {} }
 
-func test_merge_pool_item_consumes_two_produces_one() -> void:
+func test_mule_merge_consumes_two_produces_one() -> void:
 	var e := _warrior_entry()
-	var owned := { "iron_sword": 2 }
+	var mule := { Vector2i(0,0): "iron_sword", Vector2i(3,0): "iron_sword" }
 	var p = Prep.new()
 	add_child_autofree(p)
-	p.setup([e], owned, {})
-	assert_true(p.merge_pool_item("iron_sword"), "2件白铁剑可合成")
-	assert_eq(int(owned.get("iron_sword", 0)), 0, "消耗了2件白铁剑")
-	assert_eq(int(owned.get("iron_sword@1", 0)), 1, "得到1件绿铁剑")
+	p.setup([e], mule, {})
+	p.handle_drop("mule", Vector2i(0,0), p.grab_payload("mule", Vector2i(3,0)))
+	assert_eq(mule.get(Vector2i(0,0)), "iron_sword@1", "2件白铁剑合成为1件绿铁剑")
+	assert_false(mule.has(Vector2i(3,0)), "被消耗的那把腾空")
+	assert_eq(mule.size(), 1, "驮兽里只剩合成结果这一件")
 
-func test_merge_pool_item_fails_with_insufficient_count() -> void:
+func test_mule_merge_fails_for_non_mergeable() -> void:
+	# 非合成链物品（固定色阶）：拖同款叠上去不合成，按常规重叠规则拒绝，两件都原地不动
 	var e := _warrior_entry()
-	var owned := { "iron_sword": 1 }
+	var mule := { Vector2i(0,0): "crit_gem", Vector2i(3,0): "crit_gem" }
 	var p = Prep.new()
 	add_child_autofree(p)
-	p.setup([e], owned, {})
-	assert_false(p.merge_pool_item("iron_sword"), "只有1件不能合成")
-
-func test_merge_pool_item_fails_for_non_mergeable() -> void:
-	var e := _warrior_entry()
-	var owned := { "crit_gem": 3 }
-	var p = Prep.new()
-	add_child_autofree(p)
-	p.setup([e], owned, {})
-	assert_false(p.merge_pool_item("crit_gem"), "非合成链物品即便≥2件也不能合成")
+	p.setup([e], mule, {})
+	p.handle_drop("mule", Vector2i(0,0), p.grab_payload("mule", Vector2i(3,0)))
+	assert_eq(mule.get(Vector2i(0,0)), "crit_gem", "非合成链物品即便同款落上去也不合成")
+	assert_eq(mule.get(Vector2i(3,0)), "crit_gem", "落点被拒 → 源物品留在原位")
 
 func test_bag_drag_onto_matching_item_merges() -> void:
 	# 拖一把白铁剑落到另一把白铁剑上 → 合成为绿铁剑，原地
 	var e := _warrior_entry()
 	e["grid"][Vector2i(0, 0)] = "iron_sword"
-	var owned := { "iron_sword": 1 }
+	var mule := { Vector2i(0,0): "iron_sword" }
 	var p = Prep.new()
 	add_child_autofree(p)
-	p.setup([e], owned, {})
-	var data = p.grab_payload("pool", "iron_sword")
+	p.setup([e], mule, {})
+	var data = p.grab_payload("mule", Vector2i(0,0))
 	p.handle_drop("bag", { "hero_index": 0, "cell": Vector2i(0, 0) }, data)
 	assert_eq(e["grid"].get(Vector2i(0, 0)), "iron_sword@1", "落在同款上 → 原地合成为绿")
-	assert_eq(int(owned.get("iron_sword", 0)), 0, "库存那把被消耗")
+	assert_false(mule.has(Vector2i(0,0)), "驮兽那把被消耗")
 
 func test_bag_drag_different_tier_does_not_merge() -> void:
 	# 白铁剑拖到绿铁剑上：色阶不同，不合成，按常规重叠规则拒绝
 	var e := _warrior_entry()
 	e["grid"][Vector2i(0, 0)] = "iron_sword@1"   # 绿
-	var owned := { "iron_sword": 1 }              # 白
+	var mule := { Vector2i(0,0): "iron_sword" }   # 白
 	var p = Prep.new()
 	add_child_autofree(p)
-	p.setup([e], owned, {})
-	var data = p.grab_payload("pool", "iron_sword")
+	p.setup([e], mule, {})
+	var data = p.grab_payload("mule", Vector2i(0,0))
 	p.handle_drop("bag", { "hero_index": 0, "cell": Vector2i(0, 0) }, data)
 	assert_eq(e["grid"].get(Vector2i(0, 0)), "iron_sword@1", "色阶不同 → 不合成，原物不变")
-	assert_eq(int(owned.get("iron_sword", 0)), 1, "库存那把没被消耗（拒绝落地）")
+	assert_eq(mule.get(Vector2i(0,0)), "iron_sword", "驮兽那把没被消耗（拒绝落地）")
 
 func test_bag_can_drop_reports_merge_as_placeable() -> void:
 	var e := _warrior_entry()
 	e["grid"][Vector2i(0, 0)] = "iron_sword"
 	var p = Prep.new()
 	add_child_autofree(p)
-	p.setup([e], { "iron_sword": 1 }, {})
-	assert_true(p.bag_can_drop(0, "iron_sword", { "kind": "pool" }, Vector2i(0, 0)),
+	p.setup([e], { Vector2i(0,0): "iron_sword" }, {})
+	assert_true(p.bag_can_drop(0, "iron_sword", { "kind": "mule", "anchor": Vector2i(0,0) }, Vector2i(0, 0)),
 		"落点是可合成的同款 → 幽灵预览应报可放（绿）")
 
 

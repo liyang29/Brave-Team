@@ -36,6 +36,17 @@ func test_price_by_rarity() -> void:
 	assert_eq(LootTable.price("crit_gem"), 250, "史诗=250")
 
 
+func test_sell_price_is_half_of_buy_price() -> void:
+	assert_eq(LootTable.sell_price("iron_sword"), 25, "普通卖价=进价五折 50→25")
+	assert_eq(LootTable.sell_price("longsword"), 60, "稀有卖价=进价五折 120→60")
+	assert_eq(LootTable.sell_price("crit_gem"), 125, "史诗卖价=进价五折 250→125")
+
+func test_sell_price_ignores_tier() -> void:
+	# 色阶合成品按基础 rarity 算卖价，不因为合成过更贵（两条轴独立，同 price()）
+	assert_eq(LootTable.sell_price("iron_sword"), LootTable.sell_price("iron_sword@3"),
+		"白铁剑和紫铁剑卖价一样（都按基础 rarity=common）")
+
+
 func test_weighting_favors_common_over_epic() -> void:
 	# 统计大量单抽，普通应明显多于史诗（概率性，给足样本 + 宽松阈值）
 	var common := 0

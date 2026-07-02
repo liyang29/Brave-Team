@@ -178,7 +178,7 @@ func test_pre_boss_layer_is_rest() -> void:
 func test_start_run_inits_backpack_state() -> void:
 	RunManager.start_run()
 	assert_true(RunManager.roster.is_empty(), "起手空名册")
-	assert_true(RunManager.owned_items.is_empty(), "起手库存空")
+	assert_true(RunManager.mule_grid.is_empty(), "起手驮兽空")
 	assert_true(RunManager.squad_slots.is_empty(), "起手无站位")
 
 func test_party_is_view_of_roster() -> void:
@@ -196,11 +196,11 @@ func test_backpack_state_persists_across_nodes() -> void:
 	RunManager.start_run()
 	_chain(["village", "battle", "boss"])
 	_seed_team()
-	RunManager.owned_items["iron_sword"] = 2
+	RunManager.mule_grid[Vector2i(0, 0)] = "iron_sword"
 	RunManager.roster[0]["grid"][Vector2i(0, 0)] = "longsword"
 	_step()   # 村庄 → 走到下一节点
 	assert_eq(RunManager.current_layer(), 1, "前进到第 1 层")
-	assert_eq(int(RunManager.owned_items.get("iron_sword", 0)), 2, "库存跨节点保留")
+	assert_eq(RunManager.mule_grid.get(Vector2i(0, 0)), "iron_sword", "驮兽跨节点保留")
 	assert_eq(RunManager.roster[0]["grid"].get(Vector2i(0, 0)), "longsword", "背包摆放跨节点保留")
 
 func test_encounter_combat_path_runs() -> void:
@@ -228,9 +228,10 @@ func test_finish_draft_adds_kept_and_returns_to_map() -> void:
 	_goto_type("battle")
 	var id: String = RunManager.current_node_id
 	RunManager.resolve_encounter(true)
-	RunManager.finish_draft(["iron_sword", "shield"])
-	assert_eq(int(RunManager.owned_items.get("iron_sword", 0)), 1, "留下的物品进库存")
-	assert_eq(int(RunManager.owned_items.get("shield", 0)), 1, "留下的第二件进库存")
+	var overflow: Array = RunManager.finish_draft(["iron_sword", "shield"])
+	assert_true(overflow.is_empty(), "空驮兽装得下这两件，没有溢出")
+	assert_true("iron_sword" in RunManager.mule_grid.values(), "留下的物品进驮兽")
+	assert_true("shield" in RunManager.mule_grid.values(), "留下的第二件进驮兽")
 	assert_eq(RunManager.state, RunManager.State.MAP, "回到地图（等玩家选后继）")
 	assert_eq(RunManager.current_node_id, id, "draft 结束不自动前进（分支图由玩家选后继）")
 	assert_true(RunManager.pending_draft.is_empty(), "pending_draft 清空")
@@ -289,7 +290,7 @@ func test_buy_item_deducts_gold_and_stocks() -> void:
 	var g0: int = RunManager.gold
 	assert_true(RunManager.buy_item(item), "金币够 → 买成功")
 	assert_eq(RunManager.gold, g0 - cost, "扣对应金币")
-	assert_eq(int(RunManager.owned_items.get(item, 0)), 1, "买到的进库存")
+	assert_true(item in RunManager.mule_grid.values(), "买到的进驮兽")
 	assert_false(item in RunManager.shop_stock, "买后下架")
 
 func test_buy_fails_without_gold() -> void:
@@ -297,6 +298,63 @@ func test_buy_fails_without_gold() -> void:
 	RunManager.enter_current_node()
 	RunManager.gold = 0
 	assert_false(RunManager.buy_item(RunManager.shop_stock[0]), "没钱 → 买失败")
+
+
+# ── 驮兽仓库：空间容量 + 卖出 + 丢弃 ─────────────────────────────────────────────
+
+func _fill_mule() -> void:
+	for y in range(6):
+		for x in range(6):
+			RunManager.mule_grid[Vector2i(x, y)] = "whetstone"
+
+func test_buy_fails_when_mule_full() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()
+	RunManager.gold = 99999
+	_fill_mule()
+	var item: String = RunManager.shop_stock[0]
+	var g0: int = RunManager.gold
+	assert_false(RunManager.buy_item(item), "驮兽满了 → 买不了，哪怕金币够")
+	assert_eq(RunManager.gold, g0, "买失败不扣钱")
+	assert_true(item in RunManager.shop_stock, "买失败不下架")
+
+func test_mule_has_room_reflects_capacity() -> void:
+	RunManager.start_run()
+	assert_true(RunManager.mule_has_room("iron_sword"), "空驮兽装得下")
+	_fill_mule()
+	assert_false(RunManager.mule_has_room("iron_sword"), "塞满 36 格后装不下新的")
+
+func test_finish_draft_returns_overflow_when_mule_full() -> void:
+	_goto_type("battle")
+	RunManager.resolve_encounter(true)
+	_fill_mule()
+	var overflow: Array = RunManager.finish_draft(["iron_sword", "shield"])
+	assert_eq(overflow, ["iron_sword", "shield"], "驮兽满了 → 两件都没装下，原样返回")
+	assert_false("iron_sword" in RunManager.mule_grid.values(), "没被硬塞进去")
+
+func test_sell_mule_item_awards_gold_and_clears_anchor() -> void:
+	RunManager.start_run()
+	RunManager.mule_grid[Vector2i(0, 0)] = "iron_sword"
+	var g0: int = RunManager.gold
+	assert_true(RunManager.sell_mule_item(Vector2i(0, 0)), "卖出成功")
+	assert_eq(RunManager.gold, g0 + LootTable.sell_price("iron_sword"), "拿到卖出价")
+	assert_false(RunManager.mule_grid.has(Vector2i(0, 0)), "格子腾空")
+
+func test_sell_mule_item_fails_on_empty_anchor() -> void:
+	RunManager.start_run()
+	assert_false(RunManager.sell_mule_item(Vector2i(0, 0)), "空锚点卖不出东西")
+
+func test_discard_mule_item_clears_without_gold() -> void:
+	RunManager.start_run()
+	RunManager.mule_grid[Vector2i(0, 0)] = "iron_sword"
+	var g0: int = RunManager.gold
+	assert_true(RunManager.discard_mule_item(Vector2i(0, 0)), "丢弃成功")
+	assert_eq(RunManager.gold, g0, "丢弃不给钱")
+	assert_false(RunManager.mule_grid.has(Vector2i(0, 0)), "格子腾空")
+
+func test_discard_mule_item_fails_on_empty_anchor() -> void:
+	RunManager.start_run()
+	assert_false(RunManager.discard_mule_item(Vector2i(0, 0)), "空锚点丢不了东西")
 
 func test_can_leave_village_requires_min_party() -> void:
 	RunManager.start_run()

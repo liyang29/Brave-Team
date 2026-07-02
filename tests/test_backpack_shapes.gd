@@ -89,3 +89,71 @@ func test_1x1_adjacency_unchanged() -> void:
 	assert_true("开刃" in adj["synergies"], "剑+磨刀石相邻 → 开刃")
 	var far := Backpack.compute({ Vector2i(0, 0): "iron_sword", Vector2i(2, 0): "whetstone" })
 	assert_false("开刃" in far["synergies"], "隔开 → 不开刃")
+
+
+# ── 驮兽仓库：网格函数泛化支持任意宽高（MULE_GRID_W/H=6×6）────────────────────
+
+func test_mule_grid_size_constants() -> void:
+	assert_eq(Backpack.MULE_GRID_W, 6, "驮兽仓库宽 6（先定成这样，以后升级容量改这个数）")
+	assert_eq(Backpack.MULE_GRID_H, 6, "驮兽仓库高 6")
+
+func test_in_bounds_respects_custom_dims() -> void:
+	assert_true(Backpack.in_bounds(Vector2i(5, 5), 6, 6), "6×6 网格里 (5,5) 在界内")
+	assert_false(Backpack.in_bounds(Vector2i(4, 0), 4, 4), "同一坐标在 4×4 英雄背包里越界")
+
+func test_can_place_respects_custom_dims() -> void:
+	# 锁甲 2×2 放 (4,4)：4×4 背包越界，6×6 驮兽不越界
+	assert_false(Backpack.can_place({}, "chainmail", Vector2i(4, 4)), "缺省尺寸(4×4) → 越界")
+	assert_true(Backpack.can_place({}, "chainmail", Vector2i(4, 4), null, 6, 6), "传 6×6 → 界内可放")
+
+
+# ── first_free_anchor / has_room（自动放置 + 容量判定）──────────────────────────
+
+func test_first_free_anchor_finds_top_left_first() -> void:
+	assert_eq(Backpack.first_free_anchor({}, "whetstone", 6, 6), Vector2i(0, 0), "空网格从左上角开始找")
+
+func test_first_free_anchor_skips_occupied() -> void:
+	var grid := { Vector2i(0, 0): "whetstone" }
+	assert_eq(Backpack.first_free_anchor(grid, "whetstone", 6, 6), Vector2i(1, 0), "(0,0)占了 → 找下一个")
+
+func test_first_free_anchor_returns_sentinel_when_full() -> void:
+	# 塞满 6×6=36 个 1×1，再找就没地方了
+	var grid: Dictionary = {}
+	for y in range(6):
+		for x in range(6):
+			grid[Vector2i(x, y)] = "whetstone"
+	assert_eq(Backpack.first_free_anchor(grid, "whetstone", 6, 6), Vector2i(-1, -1), "满了 → 哨兵值")
+
+func test_has_room_true_when_space_exists() -> void:
+	assert_true(Backpack.has_room({}, "chainmail", 6, 6), "空驮兽装得下锁甲")
+
+func test_has_room_false_when_grid_full() -> void:
+	var grid: Dictionary = {}
+	for y in range(6):
+		for x in range(6):
+			grid[Vector2i(x, y)] = "whetstone"
+	assert_false(Backpack.has_room(grid, "whetstone", 6, 6), "塞满 36 格后装不下新的")
+
+
+# ── merge_target（英雄背包/驮兽仓库拖放合成共用判定，原两处面板脚本各抄一份）────
+
+func test_merge_target_same_base_same_tier() -> void:
+	var grid := { Vector2i(0, 0): "iron_sword" }
+	assert_eq(Backpack.merge_target(grid, "iron_sword", Vector2i(0, 0)), Vector2i(0, 0), "同款同色阶 → 返回该锚点")
+
+func test_merge_target_null_when_different_tier() -> void:
+	var grid := { Vector2i(0, 0): "iron_sword@1" }
+	assert_null(Backpack.merge_target(grid, "iron_sword", Vector2i(0, 0)), "色阶不同 → 不合成")
+
+func test_merge_target_null_when_non_mergeable() -> void:
+	var grid := { Vector2i(0, 0): "crit_gem" }
+	assert_null(Backpack.merge_target(grid, "crit_gem", Vector2i(0, 0)), "非合成链物品 → 不合成")
+
+func test_merge_target_null_when_empty_cell() -> void:
+	assert_null(Backpack.merge_target({}, "iron_sword", Vector2i(0, 0)), "空格子 → 没有合成目标")
+
+func test_merge_target_null_when_ignoring_own_anchor() -> void:
+	# 物品在网格内挪动时排除自身原占用，不会跟自己"合成"
+	var grid := { Vector2i(0, 0): "iron_sword" }
+	assert_null(Backpack.merge_target(grid, "iron_sword", Vector2i(0, 0), Vector2i(0, 0)),
+		"ignore=自身锚点 → 不当合成目标")

@@ -10,6 +10,7 @@ extends Control
 const SCENE_MAP := "res://scenes/run/RunMap.tscn"
 const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
+const MulePanel = preload("res://scripts/ui/MulePanel.gd")
 
 const CLASS_ZH := {
 	Hero.HeroClass.WARRIOR: "战士", Hero.HeroClass.MAGE: "法师", Hero.HeroClass.PRIEST: "牧师",
@@ -21,6 +22,7 @@ var _gold_label: Label
 var _party_box: VBoxContainer
 var _recruit_box: VBoxContainer
 var _shop_box: VBoxContainer
+var _mule_panel: MulePanel
 var _locked_box: VBoxContainer
 var _leave_btn: Button
 
@@ -58,10 +60,15 @@ func _ready() -> void:
 	_recruit_box.add_theme_constant_override("separation", 6)
 	root.add_child(_recruit_box)
 
-	root.add_child(_section("商店（买装备进库存，战前摆进背包；只买不卖）"))
+	root.add_child(_section("商店（买装备进驮兽仓库，战前摆进背包）"))
 	_shop_box = VBoxContainer.new()
 	_shop_box.add_theme_constant_override("separation", 6)
 	root.add_child(_shop_box)
+
+	root.add_child(_section("驮兽仓库（拖拽整理/合成 · 拖到丢弃桶清空 · 拖到卖出格换钱）"))
+	_mule_panel = MulePanel.new()
+	root.add_child(_mule_panel)
+	_mule_panel.setup()
 
 	root.add_child(_section("待解锁（局外成长：这个存档历史最深打到过第几层，永久解锁，与本局输赢无关）"))
 	_locked_box = VBoxContainer.new()
@@ -95,6 +102,7 @@ func _refresh() -> void:
 	_refresh_party()
 	_refresh_recruit()
 	_refresh_shop()
+	_mule_panel.refresh()
 	_refresh_locked()
 	# 至少招满最小人数才能出发（1 人打不过第一关）
 	var can_leave: bool = RunManager.can_leave_village()
@@ -164,11 +172,12 @@ func _refresh_shop() -> void:
 		desc.mouse_filter = Control.MOUSE_FILTER_STOP
 		desc.tooltip_text = Backpack.item_tooltip(item_id)
 		row.add_child(desc)
+		var has_room: bool = RunManager.mule_has_room(item_id)
 		var btn := Button.new()
 		btn.custom_minimum_size = Vector2(150, 34)
-		btn.tooltip_text = Backpack.item_tooltip(item_id)
-		btn.text = "买 %d 金" % cost
-		btn.disabled = RunManager.gold < cost
+		btn.tooltip_text = "驮兽仓库满了，装不下这件" if not has_room else Backpack.item_tooltip(item_id)
+		btn.text = "买 %d 金" % cost if has_room else "驮兽满"
+		btn.disabled = RunManager.gold < cost or not has_room
 		btn.pressed.connect(func():
 			RunManager.buy_item(item_id)
 			call_deferred("_refresh"))

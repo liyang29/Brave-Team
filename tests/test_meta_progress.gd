@@ -11,6 +11,7 @@ const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 func before_each() -> void:
 	MetaProgress.reset()
 	MetaProgress.autosave = false   # 默认存档路径=玩家真实存档，测试解锁不该写进去
+	RunManager.RECRUIT_POOL_OVERRIDE = []   # 测试要看真实解锁池，不受玩家手动限定招募的影响
 
 func after_each() -> void:
 	MetaProgress.reset()

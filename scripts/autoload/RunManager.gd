@@ -44,6 +44,13 @@ const HERO_TEMPLATES: Dictionary = {
 # ⚠️ GDScript 常量表达式不能调 HERO_TEMPLATES.size()（非编译期常量），手动同步：
 #    加/删英雄职业时这个数字要跟着改，否则要么漏显示、要么多要不存在的候选。
 const TAVERN_OFFERS := 5     # = HERO_TEMPLATES.size()（当前 5 职业：战法牧盗猎）
+
+# 手动限定招募池（跟 MetaProgress 局外解锁是两回事，互不影响存档）：
+#   留空 [] = 默认——招募池 = HERO_TEMPLATES 里"局外已解锁"的职业（正常玩法）。
+#   填了 id = 只从这些 id 里抽，哪怕其它职业已经解锁也不会出现（想临时只玩战法牧就填这三个）。
+# 随时改随时生效，不影响存档里的解锁记录——清空这个数组就恢复原样，解锁进度还在。
+# 用 var（不是 const）纯粹是方便测试临时重置；日常改玩法直接改这行的初始值即可。
+var RECRUIT_POOL_OVERRIDE: Array = ["warrior", "mage", "priest"]
 # 起手队伍：空——在起手村庄招募组建（决定：初始空队）。
 const STARTER_TEAM: Array = []
 
@@ -357,6 +364,9 @@ func _roll_recruits(n: int) -> Array:
 	# 只从"局外已解锁"的职业里抽（MetaProgress；未解锁的职业压根不会被招到，
 	# 想让玩家提前看到"还有职业待解锁"用 MetaProgress.locked_summary() 走 UI）。
 	var ids: Array = HERO_TEMPLATES.keys().filter(func(id): return MetaProgress.is_unlocked(id))
+	# 手动覆盖（RECRUIT_POOL_OVERRIDE 非空时生效）：再交叉一遍，缩小到指定职业。
+	if not RECRUIT_POOL_OVERRIDE.is_empty():
+		ids = ids.filter(func(id): return id in RECRUIT_POOL_OVERRIDE)
 	ids.shuffle()
 	return ids.slice(0, min(n, ids.size()))
 

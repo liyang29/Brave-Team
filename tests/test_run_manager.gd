@@ -15,6 +15,7 @@ const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 func before_each() -> void:
 	MetaProgress.reset()
 	MetaProgress.autosave = false
+	RunManager.RECRUIT_POOL_OVERRIDE = []   # 测试要看真实解锁池，不受玩家手动限定招募的影响
 
 # 注入一条确定的单后继链地图（types[0]→types[1]→…），当前节点 = 第 0 个。
 # 用于导航/房间/draft 单测，隔离随机生成的不确定性。

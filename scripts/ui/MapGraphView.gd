@@ -23,6 +23,7 @@ const TYPE_ICON := {
 }
 
 var _centers: Dictionary = {}   # id -> Vector2（节点中心，画线用）
+var current_node_control: Control = null   # 当前节点的静态面板（外层用来定位自动滚动）
 
 
 func _ready() -> void:
@@ -45,6 +46,7 @@ func _build() -> void:
 		MARGIN * 2 + layers * ROW_H)
 
 	_centers.clear()
+	current_node_control = null
 	for id in nodes:
 		var n: Dictionary = nodes[id]
 		var pos := _node_pos(int(n["col"]), int(n["layer"]))
@@ -85,6 +87,7 @@ func _add_node(n: Dictionary, id: String, cur_id: String, cur_layer: int,
 	if id == cur_id:
 		lbl.text = "◉ " + text
 		lbl.modulate = Color(1.0, 0.95, 0.55)      # 当前位置：亮黄
+		current_node_control = panel
 	elif int(n["layer"]) < cur_layer:
 		lbl.text = text
 		lbl.modulate = Color(0.42, 0.48, 0.42)     # 已过：暗绿

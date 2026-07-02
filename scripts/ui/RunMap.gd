@@ -10,6 +10,9 @@ extends Control
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 const MapGraphView = preload("res://scripts/ui/MapGraphView.gd")
 const SCENE_TITLE := "res://scenes/ui/TitleScreen.tscn"
+const MAP_SCROLL_HEIGHT := 420.0   # 跟 scroll.custom_minimum_size.y 保持一致，用来算"当前节点居中"的滚动量
+
+var _scroll: ScrollContainer = null   # 暴露给测试读 scroll_vertical，验证"自动滚到当前节点"
 
 func _ready() -> void:
 	var root := VBoxContainer.new()
@@ -39,12 +42,17 @@ func _ready() -> void:
 
 	# 地图图（自定义绘制：连接线 + 按列摆节点），大图交给 ScrollContainer 滚动
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(0, 420)
+	scroll.custom_minimum_size = Vector2(0, MAP_SCROLL_HEIGHT)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var graph := MapGraphView.new()
 	graph.node_chosen.connect(_on_node_chosen)
 	scroll.add_child(graph)
 	root.add_child(scroll)
+	_scroll = scroll
+	# 每次进地图都自动滚到当前节点（居中显示），不用每次手动往下拖找自己在哪
+	if graph.current_node_control != null:
+		var target_y: float = graph.current_node_control.position.y + graph.current_node_control.size.y * 0.5
+		scroll.scroll_vertical = int(max(0.0, target_y - MAP_SCROLL_HEIGHT * 0.5))
 
 	# 队伍状态
 	root.add_child(_section("队伍"))

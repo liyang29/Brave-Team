@@ -76,6 +76,48 @@ func test_fixed_tier_of() -> void:
 	assert_eq(Backpack.fixed_tier_of("iron_sword"), -1, "合成链物品无固定色阶")
 
 
+# ── 深度门控：min_layer ────────────────────────────────────────────────────────
+
+func test_min_layer_defaults_to_zero() -> void:
+	assert_eq(Backpack.min_layer_of("iron_sword"), 0, "普通装备不设门槛，起手就能遇到")
+	assert_eq(Backpack.min_layer_of("shield"), 0, "普通装备不设门槛")
+
+func test_min_layer_gates_special_items() -> void:
+	assert_eq(Backpack.min_layer_of("keen_edge"), 1, "锋锐之刃 min_layer 1")
+	assert_eq(Backpack.min_layer_of("war_banner"), 2, "军旗 min_layer 2")
+	assert_eq(Backpack.min_layer_of("crit_gem"), 4, "暴击宝石 min_layer 4")
+	assert_eq(Backpack.min_layer_of("decoy_mask"), 5, "诱敌面具 min_layer 5")
+	assert_eq(Backpack.min_layer_of("iron_standard"), 5, "铁壁旗 min_layer 5")
+
+func test_draw_draft_excludes_gated_items_at_low_layer() -> void:
+	# 第 0 层：min_layer>0 的物品一件都不该出现（跑很多次覆盖随机性）
+	for i in range(80):
+		var draft: Array = LootTable.draw_draft(3, 0)
+		for id in draft:
+			assert_eq(Backpack.min_layer_of(id), 0, "第0层掉落的 %s 不该有门槛" % id)
+
+func test_draw_draft_allows_gated_items_at_high_layer() -> void:
+	# 第 10 层：门槛全部解开，理论上能抽到任意物品（跑很多次应至少见到一件 min_layer>0 的）
+	var saw_gated := false
+	for i in range(80):
+		var draft: Array = LootTable.draw_draft(3, 10)
+		for id in draft:
+			if Backpack.min_layer_of(id) > 0:
+				saw_gated = true
+	assert_true(saw_gated, "第10层应能抽到深度门控物品（80次里至少一次，概率上稳）")
+
+func test_draw_draft_default_layer_is_ungated() -> void:
+	# 不传 layer（旧调用/旧测试）→ 默认几乎不限，行为与门控加入前一致
+	var huge: Array = LootTable.draw_draft(9999)
+	assert_eq(huge.size(), Backpack.ITEMS.size(), "不传层数 → 不限门槛，仍能抽满整池")
+
+func test_shop_stock_respects_layer_gate() -> void:
+	RunManager.start_run()
+	RunManager.enter_current_node()   # 第 0 层村庄
+	for id in RunManager.shop_stock:
+		assert_eq(Backpack.min_layer_of(id), 0, "第0层商店 %s 不该有门槛物品" % id)
+
+
 # ── compute() 里色阶生效 ──────────────────────────────────────────────────────
 
 func test_compute_scales_tiered_item_in_grid() -> void:

@@ -38,8 +38,12 @@ static func price(item_id: String) -> int:
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
 ## 掉落色阶两条路：mergeable 物品恒掉白（走合成链变强）；fixed_tier 机制类物品
 ## 直接固定色阶掉落（不参与合成）。
-static func draw_draft(count: int) -> Array:
-	var pool: Array = Backpack.ITEMS.keys()
+## layer：深度门控——min_layer > layer 的物品本次不进候选池（早期摸不到后期特殊物品）；
+##   缺省 999（近乎不限）保持旧调用/旧测试不指定层数时行为不变。池被门槛过滤空时兜底放开门槛。
+static func draw_draft(count: int, layer: int = 999) -> Array:
+	var pool: Array = Backpack.ITEMS.keys().filter(func(id): return Backpack.min_layer_of(id) <= layer)
+	if pool.is_empty():
+		pool = Backpack.ITEMS.keys()   # 兜底：门槛把池过滤空了 → 放开门槛，不卡死掉落/商店
 	var result: Array = []
 	var n: int = min(count, pool.size())
 	for i in range(n):

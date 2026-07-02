@@ -150,7 +150,7 @@ func enter_current_node() -> void:
 
 ## 村庄进入前准备：商店按 rarity 上货 + 随机招募候选（由 NodeTypes 的 on_enter 调）。
 func _enter_village() -> void:
-	shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE)
+	shop_stock = LootTable.draw_draft(SHOP_STOCK_SIZE, current_layer())
 	tavern_offers = _roll_recruits(TAVERN_OFFERS)
 
 
@@ -376,7 +376,7 @@ func resolve_encounter(won: bool, result = null) -> void:
 	if is_boss_node():
 		_set_state(State.VICTORY)               # 打赢魔王 = 通关（魔王是唯一汇点）
 		return
-	pending_draft = LootTable.draw_draft(3)
+	pending_draft = LootTable.draw_draft(3, current_layer())
 	_set_state(State.DRAFT)
 
 

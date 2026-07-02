@@ -31,26 +31,27 @@ const ITEMS: Dictionary = {
 	# ── 小队光环装备（aura：跨英雄加成，按 scope 作用范围，在 build_party 注入）──
 	# scope: "team"=全队(含自己) / "adjacent"=相邻站位(不含自己) / "same_row"=同排(不含自己)
 	# fixed_tier = 机制类物品不参与合成，直接按固定色阶掉落（数字见下方 TIER_NAMES 索引）。
-	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "fixed_tier": 2, "aura": { "scope": "team",     "atk": 4 } },
-	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "aura": { "scope": "adjacent", "spd": 3 } },
-	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "fixed_tier": 4, "aura": { "scope": "same_row", "def": 4 } },
-	"vanguard_horn":{ "name": "先锋号角", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "aura": { "scope": "front_row", "atk": 5 } },
-	"ward_totem":  { "name": "守护图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "aura": { "scope": "back_row",  "def": 3, "hp": 10 } },
+	# min_layer = 深度门控：早于该层不会掉落/不会在商店出现（缺省 0 = 起手就能遇到）。
+	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "team",     "atk": 4 } },
+	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "adjacent", "spd": 3 } },
+	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "fixed_tier": 4, "min_layer": 5, "aura": { "scope": "same_row", "def": 4 } },
+	"vanguard_horn":{ "name": "先锋号角", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "front_row", "atk": 5 } },
+	"ward_totem":  { "name": "守护图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "back_row",  "def": 3, "hp": 10 } },
 
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
-	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic", "fixed_tier": 3 },
-	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare", "fixed_tier": 1 },
-	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic", "fixed_tier": 3 },
+	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
+	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare", "fixed_tier": 1, "min_layer": 1 },
+	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
 
 	# ── 闪避 / 嘲讽副属性（小队第二档·"闪避T"套件）────────────────────────────
 	# dodge_chance：被攻击时几率完全免伤（战斗里 clamp 到 DODGE_CAP）。
 	# taunt：>0 = 优先被敌人攻击（吸火力保后排）。两者均走 extra 通路，同暴击。
 	# 设计：纯闪避/纯嘲讽件无属性 → 占格机会成本明显；坦克件嘲讽+防。
-	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare", "fixed_tier": 2 },
-	"shadow_mantle":{ "name": "暗影披风", "def": 2, "dodge_chance": 0.10, "tag": "evasion", "rarity": "epic", "fixed_tier": 3 },
-	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare", "fixed_tier": 2 },
-	# 诱敌面具：无裸属性、但改变职业规则（嘲讽）→ 至少橙色档（决策：不看数值看机制影响力）。
-	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common", "fixed_tier": 4 },
+	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare", "fixed_tier": 2, "min_layer": 2 },
+	"shadow_mantle":{ "name": "暗影披风", "def": 2, "dodge_chance": 0.10, "tag": "evasion", "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
+	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare", "fixed_tier": 2, "min_layer": 2 },
+	# 诱敌面具：无裸属性、但改变职业规则（嘲讽）→ 至少橙色档 + 深度门控（决策：不看数值看机制影响力）。
+	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common", "fixed_tier": 4, "min_layer": 5 },
 
 	# ── 技能书（占格、不给属性；认职业；带回合冷却）──────────────────────────
 	# 技能书 = 把"技能"也做成背包物品：占格 → 和装备抢空间（带书=少带甲）。
@@ -113,6 +114,10 @@ static func is_mergeable(item_id: String) -> bool:
 static func fixed_tier_of(item_id: String) -> int:
 	var v = item_def(item_id).get("fixed_tier", -1)
 	return int(v)
+
+## 该物品最早出现的层（深度门控；缺省 0 = 起手就能遇到）。
+static func min_layer_of(item_id: String) -> int:
+	return int(item_def(item_id).get("min_layer", 0))
 
 ## 色阶数值倍率（白×1 ... 红×32）。
 static func tier_multiplier(tier: int) -> float:

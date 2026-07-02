@@ -15,11 +15,12 @@ func test_every_item_has_known_rarity() -> void:
 
 
 func test_draw_returns_three_distinct_valid() -> void:
+	# 注：抽出的 id 可能带色阶后缀（如 "decoy_mask@4"），合法性判断要走 base_id。
 	var draft: Array = LootTable.draw_draft(3)
 	assert_eq(draft.size(), 3, "抽出 3 件")
 	var seen: Dictionary = {}
 	for id in draft:
-		assert_true(Backpack.ITEMS.has(id), "%s 是合法物品" % id)
+		assert_true(Backpack.ITEMS.has(Backpack.base_id(id)), "%s 是合法物品" % id)
 		assert_false(seen.has(id), "同一次抽不重复：%s" % id)
 		seen[id] = true
 
@@ -41,7 +42,7 @@ func test_weighting_favors_common_over_epic() -> void:
 	var epic := 0
 	for i in range(600):
 		var one: Array = LootTable.draw_draft(1)
-		var r: String = Backpack.ITEMS[one[0]].get("rarity", "")
+		var r: String = Backpack.item_def(one[0]).get("rarity", "")
 		if r == "common": common += 1
 		elif r == "epic": epic += 1
 	gut.p("common=%d  epic=%d" % [common, epic])

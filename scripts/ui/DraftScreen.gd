@@ -10,11 +10,6 @@ const SCENE_MAP := "res://scenes/run/RunMap.tscn"
 const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 
 const RARITY_ZH := { "common": "普通", "rare": "稀有", "epic": "史诗" }
-const RARITY_COLOR := {
-	"common": Color(0.8, 0.8, 0.8),
-	"rare": Color(0.45, 0.7, 1.0),
-	"epic": Color(0.85, 0.55, 1.0),
-}
 
 
 func _ready() -> void:
@@ -47,22 +42,23 @@ func _ready() -> void:
 
 
 func _make_card(item_id: String, draft: Array) -> Control:
-	var it: Dictionary = Backpack.ITEMS.get(item_id, {})
+	var it: Dictionary = Backpack.item_def(item_id)
 	var rarity: String = it.get("rarity", "common")
+	var tier_col: Color = Backpack.tier_color(Backpack.item_tier(item_id))
 
 	var box := VBoxContainer.new()
 	box.custom_minimum_size = Vector2(220, 0)
 	box.add_theme_constant_override("separation", 6)
 
 	var name_lbl := Label.new()
-	name_lbl.text = it.get("name", item_id)
+	name_lbl.text = Backpack.item_name(item_id)
 	name_lbl.add_theme_font_size_override("font_size", 20)
-	name_lbl.modulate = RARITY_COLOR.get(rarity, Color.WHITE)
+	name_lbl.modulate = tier_col
 	box.add_child(name_lbl)
 
 	var rar_lbl := Label.new()
 	rar_lbl.text = "【%s】" % RARITY_ZH.get(rarity, rarity)
-	rar_lbl.modulate = RARITY_COLOR.get(rarity, Color.WHITE)
+	rar_lbl.modulate = tier_col
 	box.add_child(rar_lbl)
 
 	var desc := Label.new()

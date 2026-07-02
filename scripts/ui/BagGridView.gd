@@ -28,11 +28,6 @@ var _ghost_ok: bool = false
 const EMPTY_BG := Color(0.13, 0.14, 0.17)
 const GRID_LINE := Color(0.28, 0.30, 0.35)
 const BORDER := Color(0.75, 0.8, 0.9, 0.9)
-const RARITY_COLOR := {
-	"common": Color(0.30, 0.34, 0.40),
-	"rare":   Color(0.20, 0.36, 0.58),
-	"epic":   Color(0.44, 0.28, 0.56),
-}
 const BOOK_COLOR := Color(0.24, 0.44, 0.32)
 
 
@@ -86,11 +81,12 @@ func _draw() -> void:
 				draw_rect(_cell_rect(c).grow(-2.0), ghost_col, true)
 
 
+## 背景色 = 色阶（白绿蓝紫橙红）；技能书不参与色阶系统，固定书本色。
 func _item_color(id: String) -> Color:
-	var it: Dictionary = Backpack.ITEMS.get(id, {})
+	var it: Dictionary = Backpack.item_def(id)
 	if it.get("tag", "") == "skillbook":
 		return BOOK_COLOR
-	return RARITY_COLOR.get(it.get("rarity", "common"), RARITY_COLOR["common"])
+	return Backpack.tier_color(Backpack.item_tier(id))
 
 func _bounding_box(cells: Array) -> Rect2:
 	var mn := Vector2(INF, INF)

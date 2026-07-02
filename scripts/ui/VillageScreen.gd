@@ -16,9 +16,6 @@ const CLASS_ZH := {
 	Hero.HeroClass.ROGUE: "盗贼", Hero.HeroClass.ARCHER: "猎人",
 }
 const RARITY_ZH := { "common": "普通", "rare": "稀有", "epic": "史诗" }
-const RARITY_COLOR := {
-	"common": Color(0.8, 0.8, 0.8), "rare": Color(0.45, 0.7, 1.0), "epic": Color(0.85, 0.55, 1.0),
-}
 
 var _gold_label: Label
 var _party_box: VBoxContainer
@@ -146,7 +143,7 @@ func _refresh_shop() -> void:
 		_shop_box.add_child(_dim("（已售空）"))
 		return
 	for item_id in RunManager.shop_stock:
-		var it: Dictionary = Backpack.ITEMS.get(item_id, {})
+		var it: Dictionary = Backpack.item_def(item_id)
 		var rarity: String = it.get("rarity", "common")
 		var cost: int = LootTable.price(item_id)
 		var row := HBoxContainer.new()
@@ -154,7 +151,7 @@ func _refresh_shop() -> void:
 		var desc := Label.new()
 		desc.custom_minimum_size = Vector2(460, 0)
 		desc.text = "【%s】%s" % [RARITY_ZH.get(rarity, rarity), Backpack.item_desc(item_id)]
-		desc.modulate = RARITY_COLOR.get(rarity, Color.WHITE)
+		desc.modulate = Backpack.tier_color(Backpack.item_tier(item_id))
 		desc.mouse_filter = Control.MOUSE_FILTER_STOP
 		desc.tooltip_text = Backpack.item_tooltip(item_id)
 		row.add_child(desc)

@@ -171,10 +171,24 @@ func _rebuild_pool() -> void:
 		var n: int = int(_pool.get(item_id, 0))
 		if n <= 0:
 			continue
+		var wrap := HBoxContainer.new()
+		wrap.add_theme_constant_override("separation", 2)
 		var slot := _new_slot("pool", item_id, Vector2(110, 44))
-		_pool_box.add_child(slot)
-		slot.set_display(Backpack.item_name(item_id), Color(0.85, 0.9, 1.0), "×%d" % n)
+		slot.set_display(Backpack.item_name(item_id), Backpack.tier_color(Backpack.item_tier(item_id)), "×%d" % n)
 		slot.tooltip_text = Backpack.item_tooltip(item_id)
+		wrap.add_child(slot)
+		if n >= 2 and Backpack.is_mergeable(item_id):
+			var result: String = Backpack.merge_result(item_id)
+			if result != "":
+				var merge_btn := Button.new()
+				merge_btn.text = "⇪合成"
+				merge_btn.custom_minimum_size = Vector2(56, 44)
+				merge_btn.tooltip_text = "消耗 2 件 → 合成 1 件 %s" % Backpack.item_name(result)
+				merge_btn.pressed.connect(func():
+					merge_pool_item(item_id)
+					refresh())
+				wrap.add_child(merge_btn)
+		_pool_box.add_child(wrap)
 
 
 func _stat_text(entry: Dictionary, fs: Dictionary) -> String:
@@ -252,7 +266,8 @@ func handle_drop(kind: String, key, data: Dictionary) -> void:
 
 
 ## 背包目标能否接收该物品（BagGridView 算落点幽灵 + 校验用）。
-## 形状感知：锚点处放得下(界内+不重叠) 才行；同背包移动排除物品自身原占用。
+## 形状感知：锚点处放得下(界内+不重叠) 才行；落在"同基础同色阶可合成"的另一件上 = 合成，
+## 也算可放（预览显示为绿）；同背包移动排除物品自身原占用。
 func bag_can_drop(hero_index: int, id: String, src: Dictionary, anchor: Vector2i) -> bool:
 	if src.get("kind", "") == "pool" and int(_pool.get(id, 0)) <= 0:
 		return false
@@ -260,7 +275,22 @@ func bag_can_drop(hero_index: int, id: String, src: Dictionary, anchor: Vector2i
 	var ignore = null
 	if src.get("kind", "") == "bag" and int(src.get("hero_index", -1)) == hero_index:
 		ignore = src.get("cell")
+	if _merge_target(dest_grid, id, anchor, ignore) != null:
+		return true
 	return Backpack.can_place(dest_grid, id, anchor, ignore)
+
+
+## 落点若压在"同基础同色阶、可合成"的现有物品上，返回该物品的锚点（合成目标）；否则 null。
+func _merge_target(dest_grid: Dictionary, id: String, anchor: Vector2i, ignore):
+	var occ_anchor = Backpack.occupied_cells(dest_grid).get(anchor)
+	if occ_anchor == null or occ_anchor == ignore:
+		return null
+	var existing_id: String = dest_grid[occ_anchor]
+	if Backpack.base_id(existing_id) != Backpack.base_id(id) or Backpack.item_tier(existing_id) != Backpack.item_tier(id):
+		return null
+	if Backpack.merge_result(id) == "":
+		return null
+	return occ_anchor
 
 
 func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
@@ -273,16 +303,45 @@ func _drop_item(data: Dictionary, dest_kind: String, dest_key) -> void:
 			_owned_add(id, 1)
 		return                        # 库存 → 库存：无操作
 
-	# dest_kind == "bag"（形状感知：放得下才放，不做交换；放不下则原地不动）
+	# dest_kind == "bag"
 	var hi: int = dest_key["hero_index"]
 	var anchor: Vector2i = dest_key["cell"]
-	if not bag_can_drop(hi, id, src, anchor):
+	var dest_grid: Dictionary = _roster[hi]["grid"]
+	var ignore = null
+	if src["kind"] == "bag" and int(src.get("hero_index", -1)) == hi:
+		ignore = src.get("cell")
+
+	# 落点是同基础同色阶可合成的物品 → 合成：消耗两件，原地生成高一色阶
+	var merge_anchor = _merge_target(dest_grid, id, anchor, ignore)
+	if merge_anchor != null:
+		_consume_dragged(src, id)
+		dest_grid[merge_anchor] = Backpack.merge_result(id)
+		return
+
+	# 形状感知：放得下才放，不做交换；放不下则原地不动
+	if not Backpack.can_place(dest_grid, id, anchor, ignore):
 		return                        # 越界/重叠/库存空 → 物品留在原处
-	if src["kind"] == "pool":         # 库存 → 背包
+	_consume_dragged(src, id)
+	dest_grid[anchor] = id
+
+
+func _consume_dragged(src: Dictionary, id: String) -> void:
+	if src["kind"] == "pool":         # 库存 → 消耗一件
 		_owned_add(id, -1)
-	elif src["kind"] == "bag":        # 背包 → 背包（同/跨英雄）：先从原位移除
+	elif src["kind"] == "bag":        # 背包 → 从原位移除
 		_roster[src["hero_index"]]["grid"].erase(src["cell"])
-	_roster[hi]["grid"][anchor] = id
+
+
+## 库存合成：某物品在库存里 ≥2 件且可合成 → 消耗 2 件、生成 1 件高一色阶。返回是否成功。
+func merge_pool_item(item_id: String) -> bool:
+	if int(_pool.get(item_id, 0)) < 2:
+		return false
+	var result: String = Backpack.merge_result(item_id)
+	if result == "":
+		return false
+	_owned_add(item_id, -2)
+	_owned_add(result, 1)
+	return true
 
 
 func _drop_hero(data: Dictionary, dest_cell: Vector2i) -> void:

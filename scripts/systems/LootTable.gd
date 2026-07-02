@@ -28,14 +28,16 @@ const RARITY_PRICES: Dictionary = {
 
 ## 物品稀有度（未知当 common）
 static func rarity_of(item_id: String) -> String:
-	return Backpack.ITEMS.get(item_id, {}).get("rarity", "common")
+	return Backpack.item_def(item_id).get("rarity", "common")
 
-## 物品售价（按 rarity）
+## 物品售价（按 rarity；色阶不影响售价——两条轴独立）
 static func price(item_id: String) -> int:
 	return int(RARITY_PRICES.get(rarity_of(item_id), RARITY_PRICES["common"]))
 
 
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
+## 掉落色阶两条路：mergeable 物品恒掉白（走合成链变强）；fixed_tier 机制类物品
+## 直接固定色阶掉落（不参与合成）。
 static func draw_draft(count: int) -> Array:
 	var pool: Array = Backpack.ITEMS.keys()
 	var result: Array = []
@@ -44,9 +46,14 @@ static func draw_draft(count: int) -> Array:
 		var pick: String = _weighted_pick(pool)
 		if pick == "":
 			break
-		result.append(pick)
-		pool.erase(pick)   # 不重复
+		result.append(_drop_id(pick))
+		pool.erase(pick)   # 不重复（按基础 id 去重，同基础物品同次不重复出现）
 	return result
+
+## 某基础物品的掉落实例 id：fixed_tier 物品固定色阶；其余（含 mergeable）恒掉白（tier0）。
+static func _drop_id(base_item_id: String) -> String:
+	var t: int = Backpack.fixed_tier_of(base_item_id)
+	return Backpack.tiered_id(base_item_id, t) if t >= 0 else base_item_id
 
 
 ## 从候选 id 列表里按 rarity 权重随机取一个

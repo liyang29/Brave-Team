@@ -307,6 +307,30 @@ func _scaled_winrate(grids: Array, group_ids: Array, layer: int, scale_cfg: Dict
 	return wins
 
 
+# ── 色阶合成压测（单件红装是否失控）──────────────────────────────────────────
+# 好 build 的地基上，把战士武器换成红铁剑(白×32=攻192)——量"一件顶格合成装备"
+# 对整局/魔王战的冲击，判断色阶系统的数值曲线是否需要收紧。
+func _red_weapon_grids() -> Array:
+	return [
+		{ Vector2i(0,0): "iron_sword@5", Vector2i(1,0): "whetstone", Vector2i(2,0): "book_slash",
+		  Vector2i(3,0): "shield", Vector2i(1,1): "chainmail" },
+		{ Vector2i(0,0): "staff", Vector2i(1,0): "tome", Vector2i(2,0): "book_fireball" },
+		{ Vector2i(0,0): "holy_symbol", Vector2i(2,0): "book_heal",
+		  Vector2i(0,1): "amulet", Vector2i(1,1): "charm" },
+	]
+
+func test_tier_merge_pressure() -> void:
+	var good := _win_rate(_good_grids())
+	var red := _win_rate(_red_weapon_grids())
+	gut.p("===== 色阶合成压测（单件红装 vs 白装好build）=====")
+	gut.p("整局通关率：白装好build %d/%d  ·  单件红装 %d/%d" % [good, TRIALS, red, TRIALS])
+	var gs := _boss_sharpness(_good_grids())
+	var rs := _boss_sharpness(_red_weapon_grids())
+	gut.p("魔王战锐度：白装好build 平均%.1f回合/剩血%.0f%%  →  单件红装 平均%.1f回合/剩血%.0f%%" %
+		[gs["turns"], gs["hp_pct"] * 100, rs["turns"], rs["hp_pct"] * 100])
+	assert_gte(red, good, "红装不应弱于白装好build（合成应是正收益，数据看 gut.p 人工判断是否离谱）")
+
+
 func test_good_build_beats_bad_build() -> void:
 	var good := _win_rate(_good_grids())
 	var ok := _win_rate(_ok_grids())

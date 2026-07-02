@@ -28,7 +28,6 @@ const START_GOLD := 500
 const SHOP_STOCK_SIZE := 6
 const REST_HEAL_PCT := 0.5   # 泉水/休息点：全员回复最大血的比例（消耗战泄压阀）
 const MAX_PARTY := 5         # 队伍上限（起手 3，酒馆最多招到 5）
-const TAVERN_OFFERS := 3     # 酒馆每次上几个候选
 const RECRUIT_COST := 120    # 招募一个英雄的金币价（和买装备抢钱）
 const MIN_PARTY_TO_LEAVE := 2  # 至少 2 人才能出发（1 人打不过第一关；本作是小队游戏）
 
@@ -41,6 +40,10 @@ const HERO_TEMPLATES: Dictionary = {
 	"rogue":   { "cls": Hero.HeroClass.ROGUE,   "name": "盗贼", "hp": 70, "atk": 7, "def": 5, "spd": 16, "magic": 0, "mp": 50 },
 	"archer":  { "cls": Hero.HeroClass.ARCHER,  "name": "猎人", "hp": 80, "atk": 7, "def": 6, "spd": 12, "magic": 0, "mp": 50 },
 }
+# 酒馆每次上几个候选：全部职业都上——避免"这村没战士"的抽卡挫败感。
+# ⚠️ GDScript 常量表达式不能调 HERO_TEMPLATES.size()（非编译期常量），手动同步：
+#    加/删英雄职业时这个数字要跟着改，否则要么漏显示、要么多要不存在的候选。
+const TAVERN_OFFERS := 5     # = HERO_TEMPLATES.size()（当前 5 职业：战法牧盗猎）
 # 起手队伍：空——在起手村庄招募组建（决定：初始空队）。
 const STARTER_TEAM: Array = []
 

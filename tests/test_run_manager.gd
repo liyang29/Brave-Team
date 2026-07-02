@@ -332,6 +332,12 @@ func test_hero_pool_has_rogue_and_archer() -> void:
 	assert_true(RunManager.HERO_TEMPLATES.has("rogue"), "英雄池含盗贼")
 	assert_true(RunManager.HERO_TEMPLATES.has("archer"), "英雄池含猎人")
 
+func test_tavern_offers_covers_every_class() -> void:
+	# TAVERN_OFFERS 是手动同步的数字（GDScript 常量表达式不能调 .size()）；
+	# 守住"酒馆一次上全部职业"这个设计意图——加/删英雄职业忘了同步这条会红。
+	assert_eq(RunManager.TAVERN_OFFERS, RunManager.HERO_TEMPLATES.size(),
+		"TAVERN_OFFERS 应等于英雄池大小（酒馆全职业候选，不漏显示也不多要）")
+
 
 # ── 节点类型注册表（单一真相源守卫）──────────────────────────────────────────
 

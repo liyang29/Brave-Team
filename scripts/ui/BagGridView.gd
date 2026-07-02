@@ -142,3 +142,14 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END:
 		_ghosting = false
 		queue_redraw()
+
+
+## 悬浮提示：自绘控件没有逐格子节点，用 Godot 的位置相关 tooltip 钩子按鼠标所在格
+## 查是哪件物品、返回它的属性文案；空格返回空串 = 不弹提示（Godot 默认行为）。
+func _get_tooltip(at_position: Vector2) -> String:
+	var cell := _cell_at(at_position)
+	var occ: Dictionary = Backpack.occupied_cells(_grid())
+	if not occ.has(cell):
+		return ""
+	var anchor: Vector2i = occ[cell]
+	return Backpack.item_tooltip(_grid()[anchor])

@@ -22,18 +22,19 @@ const SAVE_PATH := "user://meta_progress.json"
 # 解锁表：id -> 门槛层数。不在表里的 id = 默认解锁（不用挨个声明"哪些永远开放"，
 # 跟 min_layer 的"缺省 0"是同一个"默认开放，只对特例加门槛"哲学）。
 # type 仅供 UI 分类显示（"class"/"item"），解锁逻辑上一视同仁。
+# 2026-07：地图 9→45 层后按比例重标定（约 ×4~5，取整），铺满全程而不是全挤在前9层。
 const META_UNLOCKS: Dictionary = {
-	"rogue":         { "type": "class", "layer": 5, "name": "盗贼" },
-	"archer":        { "type": "class", "layer": 8, "name": "猎人" },
-	"book_cleave":   { "type": "item",  "layer": 2, "name": "横扫书" },
-	"book_taunt":    { "type": "item",  "layer": 3, "name": "挑衅书" },
-	"book_icelance": { "type": "item",  "layer": 3, "name": "冰枪书" },
-	"book_purify":   { "type": "item",  "layer": 4, "name": "净化书" },
-	"crit_gem":      { "type": "item",  "layer": 6, "name": "暴击宝石" },
-	"berserk_ring":  { "type": "item",  "layer": 7, "name": "狂战戒" },
-	"shadow_mantle": { "type": "item",  "layer": 7, "name": "暗影披风" },
-	"iron_standard": { "type": "item",  "layer": 8, "name": "铁壁旗" },
-	"decoy_mask":    { "type": "item",  "layer": 9, "name": "诱敌面具" },
+	"rogue":         { "type": "class", "layer": 25, "name": "盗贼" },
+	"archer":        { "type": "class", "layer": 35, "name": "猎人" },
+	"book_cleave":   { "type": "item",  "layer": 8,  "name": "横扫书" },
+	"book_taunt":    { "type": "item",  "layer": 12, "name": "挑衅书" },
+	"book_icelance": { "type": "item",  "layer": 12, "name": "冰枪书" },
+	"book_purify":   { "type": "item",  "layer": 16, "name": "净化书" },
+	"crit_gem":      { "type": "item",  "layer": 22, "name": "暴击宝石" },
+	"berserk_ring":  { "type": "item",  "layer": 28, "name": "狂战戒" },
+	"shadow_mantle": { "type": "item",  "layer": 28, "name": "暗影披风" },
+	"iron_standard": { "type": "item",  "layer": 34, "name": "铁壁旗" },
+	"decoy_mask":    { "type": "item",  "layer": 40, "name": "诱敌面具" },
 }
 
 var unlocked: Dictionary = {}     # id -> true（已解锁的 id 集合，Dictionary 当 Set 用）

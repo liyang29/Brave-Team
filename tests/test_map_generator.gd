@@ -80,7 +80,7 @@ func test_only_registered_types_spawn() -> void:
 			assert_true(NodeTypes.REGISTRY.has(t), "seed %d：类型 '%s' 已注册" % [s, t])
 
 func test_elite_respects_min_layer() -> void:
-	# 精英不早于 min_layer（默认 3）。
+	# 精英不早于 min_layer（读 MapConfig 动态值，不写死数字）。
 	var min_layer: int = int(MapConfig.DEFAULT["types"]["elite"].get("min_layer", 0))
 	for s in SEEDS:
 		var nodes: Dictionary = MapGenerator.generate(MapConfig.DEFAULT, s)["nodes"]

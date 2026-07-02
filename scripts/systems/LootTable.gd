@@ -30,9 +30,10 @@ const RARITY_PRICES: Dictionary = {
 # 减少纯粹拼手速合成的枯燥感；天然掉落【封顶紫色(3)】——橙/红永远只能靠玩家自己
 # 合成 16/32 把同款摸到，保住"凑齐红装"的成就感，不被运气抹平。
 # 按层分档取第一个 max_layer≥当前层的档；键=色阶索引，值=权重。
+# 2026-07：地图 9→45 层，门槛按比例重标定（约 ×2.5），铺满全程。
 const TIER_WEIGHTS_BY_LAYER: Array = [
-	{ "max_layer": 4,   "weights": { 0: 100 } },
-	{ "max_layer": 10,  "weights": { 0: 82, 1: 16, 2: 2 } },
+	{ "max_layer": 10,  "weights": { 0: 100 } },
+	{ "max_layer": 25,  "weights": { 0: 82, 1: 16, 2: 2 } },
 	{ "max_layer": 999, "weights": { 0: 60, 1: 25, 2: 12, 3: 3 } },
 ]
 

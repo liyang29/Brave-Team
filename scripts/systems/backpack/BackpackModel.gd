@@ -30,35 +30,36 @@ const ITEMS: Dictionary = {
 
 	# ── 后期基础装备（深度解锁：min_layer 门槛，数值高于早期同类；也走合成链）─────
 	# 不只是"老装备数字更大"——是新内容：早期摸不到，走到对应层数才会开始遇见/能买到。
-	"steel_sword":  { "name": "精钢剑", "atk": 10, "tag": "blade", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
-	"mithril_staff":{ "name": "秘银法杖", "magic": 10, "tag": "arcane", "shape": "1x3v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
-	"holy_hammer":  { "name": "圣光锤", "magic": 8, "def": 2, "tag": "holy", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
-	"dragon_scale": { "name": "巨龙鳞甲", "def": 12, "hp": 20, "tag": "armor", "shape": "2x2", "rarity": "epic", "mergeable": true, "min_layer": 6 },
+	# 2026-07：地图 9→45 层，门槛按比例重标定（约 ×5）。
+	"steel_sword":  { "name": "精钢剑", "atk": 10, "tag": "blade", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 15 },
+	"mithril_staff":{ "name": "秘银法杖", "magic": 10, "tag": "arcane", "shape": "1x3v", "rarity": "rare", "mergeable": true, "min_layer": 15 },
+	"holy_hammer":  { "name": "圣光锤", "magic": 8, "def": 2, "tag": "holy", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 15 },
+	"dragon_scale": { "name": "巨龙鳞甲", "def": 12, "hp": 20, "tag": "armor", "shape": "2x2", "rarity": "epic", "mergeable": true, "min_layer": 30 },
 
 	# ── 小队光环装备（aura：跨英雄加成，按 scope 作用范围，在 build_party 注入）──
 	# scope: "team"=全队(含自己) / "adjacent"=相邻站位(不含自己) / "same_row"=同排(不含自己)
 	# fixed_tier = 机制类物品不参与合成，直接按固定色阶掉落（数字见下方 TIER_NAMES 索引）。
 	# min_layer = 深度门控：早于该层不会掉落/不会在商店出现（缺省 0 = 起手就能遇到）。
-	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "team",     "atk": 4 } },
-	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "adjacent", "spd": 3 } },
-	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "fixed_tier": 4, "min_layer": 5, "aura": { "scope": "same_row", "def": 4 } },
-	"vanguard_horn":{ "name": "先锋号角", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "front_row", "atk": 5 } },
-	"ward_totem":  { "name": "守护图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 2, "aura": { "scope": "back_row",  "def": 3, "hp": 10 } },
+	"war_banner":  { "name": "军旗",   "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 10, "aura": { "scope": "team",     "atk": 4 } },
+	"speed_totem": { "name": "疾风图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 10, "aura": { "scope": "adjacent", "spd": 3 } },
+	"iron_standard":{ "name": "铁壁旗", "tag": "banner", "rarity": "epic", "fixed_tier": 4, "min_layer": 25, "aura": { "scope": "same_row", "def": 4 } },
+	"vanguard_horn":{ "name": "先锋号角", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 10, "aura": { "scope": "front_row", "atk": 5 } },
+	"ward_totem":  { "name": "守护图腾", "tag": "banner", "rarity": "rare", "fixed_tier": 2, "min_layer": 10, "aura": { "scope": "back_row",  "def": 3, "hp": 10 } },
 
 	# ── 副属性物品（第一个副属性：暴击）──────────────────────────────────────
-	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
-	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare", "fixed_tier": 1, "min_layer": 1 },
-	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
+	"crit_gem":    { "name": "暴击宝石", "crit_chance": 0.15, "tag": "crit", "rarity": "epic", "fixed_tier": 3, "min_layer": 20 },
+	"keen_edge":   { "name": "锋锐之刃", "atk": 4, "crit_chance": 0.10, "tag": "blade", "rarity": "rare", "fixed_tier": 1, "min_layer": 5 },
+	"berserk_ring":{ "name": "狂战戒",   "crit_dmg": 0.5, "tag": "crit",  "rarity": "epic", "fixed_tier": 3, "min_layer": 20 },
 
 	# ── 闪避 / 嘲讽副属性（小队第二档·"闪避T"套件）────────────────────────────
 	# dodge_chance：被攻击时几率完全免伤（战斗里 clamp 到 DODGE_CAP）。
 	# taunt：>0 = 优先被敌人攻击（吸火力保后排）。两者均走 extra 通路，同暴击。
 	# 设计：纯闪避/纯嘲讽件无属性 → 占格机会成本明显；坦克件嘲讽+防。
-	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare", "fixed_tier": 2, "min_layer": 2 },
-	"shadow_mantle":{ "name": "暗影披风", "def": 2, "dodge_chance": 0.10, "tag": "evasion", "rarity": "epic", "fixed_tier": 3, "min_layer": 4 },
-	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare", "fixed_tier": 2, "min_layer": 2 },
+	"evasion_cloak":{ "name": "疾风斗篷", "dodge_chance": 0.18, "tag": "evasion", "rarity": "rare", "fixed_tier": 2, "min_layer": 10 },
+	"shadow_mantle":{ "name": "暗影披风", "def": 2, "dodge_chance": 0.10, "tag": "evasion", "rarity": "epic", "fixed_tier": 3, "min_layer": 20 },
+	"provoke_charm":{ "name": "挑衅护符", "taunt": 1, "def": 4, "tag": "taunt", "rarity": "rare", "fixed_tier": 2, "min_layer": 10 },
 	# 诱敌面具：无裸属性、但改变职业规则（嘲讽）→ 至少橙色档 + 深度门控（决策：不看数值看机制影响力）。
-	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common", "fixed_tier": 4, "min_layer": 5 },
+	"decoy_mask":   { "name": "诱敌面具", "taunt": 1, "tag": "taunt", "rarity": "common", "fixed_tier": 4, "min_layer": 25 },
 
 	# ── 技能书（占格、不给属性；认职业；带回合冷却）──────────────────────────
 	# 技能书 = 把"技能"也做成背包物品：占格 → 和装备抢空间（带书=少带甲）。

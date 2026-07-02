@@ -83,11 +83,11 @@ func test_min_layer_defaults_to_zero() -> void:
 	assert_eq(Backpack.min_layer_of("shield"), 0, "普通装备不设门槛")
 
 func test_min_layer_gates_special_items() -> void:
-	assert_eq(Backpack.min_layer_of("keen_edge"), 1, "锋锐之刃 min_layer 1")
-	assert_eq(Backpack.min_layer_of("war_banner"), 2, "军旗 min_layer 2")
-	assert_eq(Backpack.min_layer_of("crit_gem"), 4, "暴击宝石 min_layer 4")
-	assert_eq(Backpack.min_layer_of("decoy_mask"), 5, "诱敌面具 min_layer 5")
-	assert_eq(Backpack.min_layer_of("iron_standard"), 5, "铁壁旗 min_layer 5")
+	assert_eq(Backpack.min_layer_of("keen_edge"), 5, "锋锐之刃 min_layer 5")
+	assert_eq(Backpack.min_layer_of("war_banner"), 10, "军旗 min_layer 10")
+	assert_eq(Backpack.min_layer_of("crit_gem"), 20, "暴击宝石 min_layer 20")
+	assert_eq(Backpack.min_layer_of("decoy_mask"), 25, "诱敌面具 min_layer 25")
+	assert_eq(Backpack.min_layer_of("iron_standard"), 25, "铁壁旗 min_layer 25")
 
 func test_draw_draft_excludes_gated_items_at_low_layer() -> void:
 	# 第 0 层：min_layer>0 的物品一件都不该出现（跑很多次覆盖随机性）
@@ -167,11 +167,11 @@ func test_late_game_items_are_gated_and_mergeable() -> void:
 	for id in ["steel_sword", "mithril_staff", "holy_hammer"]:
 		assert_gt(Backpack.min_layer_of(id), 0, "%s 有深度门控" % id)
 		assert_true(Backpack.is_mergeable(id), "%s 参与合成链" % id)
-	assert_eq(Backpack.min_layer_of("dragon_scale"), 6, "巨龙鳞甲(epic防具) min_layer 6，比武器类更晚")
+	assert_eq(Backpack.min_layer_of("dragon_scale"), 30, "巨龙鳞甲(epic防具) min_layer 30，比武器类更晚")
 
 func test_late_game_items_absent_before_min_layer() -> void:
 	for i in range(60):
-		var draft: Array = LootTable.draw_draft(3, 1)   # 第1层，早于所有新物品的 min_layer(3/6)
+		var draft: Array = LootTable.draw_draft(3, 1)   # 第1层，早于所有新物品的 min_layer(15/30)
 		for id in draft:
 			assert_false(Backpack.base_id(id) in ["steel_sword", "mithril_staff", "holy_hammer", "dragon_scale"],
 				"第1层不该摸到后期新装备")

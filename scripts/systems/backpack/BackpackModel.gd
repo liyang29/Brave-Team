@@ -28,6 +28,13 @@ const ITEMS: Dictionary = {
 	"charm":       { "name": "红宝石", "hp": 20, "tag": "vital",    "rarity": "rare",   "mergeable": true },
 	"mana_charm":  { "name": "法力护符", "mp": 30, "magic": 2, "tag": "arcane", "rarity": "rare", "mergeable": true },
 
+	# ── 后期基础装备（深度解锁：min_layer 门槛，数值高于早期同类；也走合成链）─────
+	# 不只是"老装备数字更大"——是新内容：早期摸不到，走到对应层数才会开始遇见/能买到。
+	"steel_sword":  { "name": "精钢剑", "atk": 10, "tag": "blade", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
+	"mithril_staff":{ "name": "秘银法杖", "magic": 10, "tag": "arcane", "shape": "1x3v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
+	"holy_hammer":  { "name": "圣光锤", "magic": 8, "def": 2, "tag": "holy", "shape": "1x2v", "rarity": "rare", "mergeable": true, "min_layer": 3 },
+	"dragon_scale": { "name": "巨龙鳞甲", "def": 12, "hp": 20, "tag": "armor", "shape": "2x2", "rarity": "epic", "mergeable": true, "min_layer": 6 },
+
 	# ── 小队光环装备（aura：跨英雄加成，按 scope 作用范围，在 build_party 注入）──
 	# scope: "team"=全队(含自己) / "adjacent"=相邻站位(不含自己) / "same_row"=同排(不含自己)
 	# fixed_tier = 机制类物品不参与合成，直接按固定色阶掉落（数字见下方 TIER_NAMES 索引）。

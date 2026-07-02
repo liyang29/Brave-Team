@@ -118,6 +118,65 @@ func test_shop_stock_respects_layer_gate() -> void:
 		assert_eq(Backpack.min_layer_of(id), 0, "第0层商店 %s 不该有门槛物品" % id)
 
 
+# ── 深度掉落色阶曲线（走得越深，越可能直接摸到预合成好的绿/蓝）──────────────────
+
+func test_shallow_layer_is_always_white() -> void:
+	# 第0-4层：曲线 100% 白，mergeable 物品即便指定了层数也不该出现色阶
+	for i in range(60):
+		var draft: Array = LootTable.draw_draft(2, 2)
+		for id in draft:
+			if Backpack.is_mergeable(id):
+				assert_eq(Backpack.item_tier(id), 0, "浅层(2) %s 应仍是白" % id)
+
+func test_deep_layer_can_drop_tiered_mergeable() -> void:
+	# 第20层（曲线最深档 60/25/12/3）：跑够样本应能见到非白的合成链物品
+	var saw_tiered := false
+	for i in range(100):
+		var draft: Array = LootTable.draw_draft(2, 20)
+		for id in draft:
+			if Backpack.is_mergeable(id) and Backpack.item_tier(id) > 0:
+				saw_tiered = true
+	assert_true(saw_tiered, "第20层应能摸到预合成的非白装备（100次里至少一次，概率上稳）")
+
+func test_natural_drop_never_exceeds_purple() -> void:
+	# 天然掉落封顶紫色(3)——橙(4)/红(5)只能靠玩家自己合成，不会被 LootTable 直接掉出
+	for i in range(150):
+		var draft: Array = LootTable.draw_draft(3, 50)
+		for id in draft:
+			if Backpack.is_mergeable(id):
+				assert_lte(Backpack.item_tier(id), 3, "%s 天然掉落不应超过紫色(3)" % id)
+
+func test_tier_weights_by_layer_never_exceed_cap() -> void:
+	# 数据层面直接校验曲线表：任何档位的权重表都不包含 tier>3 的键
+	for cfg in LootTable.TIER_WEIGHTS_BY_LAYER:
+		for t in cfg["weights"].keys():
+			assert_lte(int(t), 3, "曲线表不应配置超过紫色(3)的档")
+
+
+# ── 新增后期基础装备（深度解锁新内容，非单纯数字更大）────────────────────────────
+
+func test_late_game_items_have_higher_base_stats() -> void:
+	assert_gt(int(Backpack.item_def("steel_sword").get("atk", 0)), int(Backpack.item_def("iron_sword").get("atk", 0)),
+		"精钢剑攻击 > 铁剑")
+	assert_gt(int(Backpack.item_def("mithril_staff").get("magic", 0)), int(Backpack.item_def("staff").get("magic", 0)),
+		"秘银法杖魔力 > 法杖")
+	assert_gt(int(Backpack.item_def("dragon_scale").get("def", 0)), int(Backpack.item_def("chainmail").get("def", 0)),
+		"巨龙鳞甲防御 > 锁甲")
+
+func test_late_game_items_are_gated_and_mergeable() -> void:
+	for id in ["steel_sword", "mithril_staff", "holy_hammer"]:
+		assert_gt(Backpack.min_layer_of(id), 0, "%s 有深度门控" % id)
+		assert_true(Backpack.is_mergeable(id), "%s 参与合成链" % id)
+	assert_eq(Backpack.min_layer_of("dragon_scale"), 6, "巨龙鳞甲(epic防具) min_layer 6，比武器类更晚")
+
+func test_late_game_items_absent_before_min_layer() -> void:
+	for i in range(60):
+		var draft: Array = LootTable.draw_draft(3, 1)   # 第1层，早于所有新物品的 min_layer(3/6)
+		for id in draft:
+			assert_false(Backpack.base_id(id) in ["steel_sword", "mithril_staff", "holy_hammer", "dragon_scale"],
+				"第1层不该摸到后期新装备")
+
+
 # ── compute() 里色阶生效 ──────────────────────────────────────────────────────
 
 func test_compute_scales_tiered_item_in_grid() -> void:
@@ -134,19 +193,20 @@ func test_compute_synergy_unaffected_by_tier() -> void:
 
 # ── 掉落分流：mergeable恒白 / fixed_tier恒定色 ─────────────────────────────────
 
-func test_mergeable_items_always_drop_white() -> void:
+func test_mergeable_items_drop_white_when_layer_unspecified() -> void:
+	# 未指定层数(旧调用/旧测试兼容路径) → 合成链物品恒掉白；指定层数后见 test_tier_weights_by_layer 系列。
 	for i in range(50):
 		var draft: Array = LootTable.draw_draft(1)
 		if draft.is_empty():
 			continue
 		var id: String = draft[0]
 		if Backpack.is_mergeable(id):
-			assert_eq(Backpack.item_tier(id), 0, "%s 合成链物品恒掉白" % id)
+			assert_eq(Backpack.item_tier(id), 0, "%s 未指定层数时恒掉白" % id)
 
 func test_fixed_tier_items_drop_at_configured_tier() -> void:
 	# decoy_mask 固定橙(4)；直接验证 LootTable 内部映射函数
-	assert_eq(LootTable._drop_id("decoy_mask"), "decoy_mask@4", "诱敌面具掉落即带橙色后缀")
-	assert_eq(LootTable._drop_id("iron_sword"), "iron_sword", "合成链物品掉落是裸 base id（白）")
+	assert_eq(LootTable._drop_id("decoy_mask", -1), "decoy_mask@4", "诱敌面具掉落即带橙色后缀（固定色阶不受层数影响）")
+	assert_eq(LootTable._drop_id("iron_sword", -1), "iron_sword", "未指定层数 → 合成链物品掉落是裸 base id（白）")
 
 func test_price_unaffected_by_tier() -> void:
 	# 两条轴独立：rarity(定价) 不因色阶变化

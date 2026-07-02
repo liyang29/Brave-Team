@@ -25,6 +25,17 @@ const RARITY_PRICES: Dictionary = {
 	"epic": 250,
 }
 
+# ── 深度掉落色阶曲线 ──────────────────────────────────────────────────────────
+# mergeable 物品掉落时按"当前层数"掷一个色阶（越深越可能直接掉出预合成好的绿/蓝），
+# 减少纯粹拼手速合成的枯燥感；天然掉落【封顶紫色(3)】——橙/红永远只能靠玩家自己
+# 合成 16/32 把同款摸到，保住"凑齐红装"的成就感，不被运气抹平。
+# 按层分档取第一个 max_layer≥当前层的档；键=色阶索引，值=权重。
+const TIER_WEIGHTS_BY_LAYER: Array = [
+	{ "max_layer": 4,   "weights": { 0: 100 } },
+	{ "max_layer": 10,  "weights": { 0: 82, 1: 16, 2: 2 } },
+	{ "max_layer": 999, "weights": { 0: 60, 1: 25, 2: 12, 3: 3 } },
+]
+
 
 ## 物品稀有度（未知当 common）
 static func rarity_of(item_id: String) -> String:
@@ -36,28 +47,62 @@ static func price(item_id: String) -> int:
 
 
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
-## 掉落色阶两条路：mergeable 物品恒掉白（走合成链变强）；fixed_tier 机制类物品
-## 直接固定色阶掉落（不参与合成）。
-## layer：深度门控——min_layer > layer 的物品本次不进候选池（早期摸不到后期特殊物品）；
-##   缺省 999（近乎不限）保持旧调用/旧测试不指定层数时行为不变。池被门槛过滤空时兜底放开门槛。
-static func draw_draft(count: int, layer: int = 999) -> Array:
-	var pool: Array = Backpack.ITEMS.keys().filter(func(id): return Backpack.min_layer_of(id) <= layer)
-	if pool.is_empty():
-		pool = Backpack.ITEMS.keys()   # 兜底：门槛把池过滤空了 → 放开门槛，不卡死掉落/商店
+## 掉落色阶三条路：fixed_tier 机制类物品固定色阶（不参与合成）；mergeable 物品按层数
+## 掷色阶（深度掉落曲线，见 TIER_WEIGHTS_BY_LAYER）；其余（如技能书）恒白。
+## layer：调用方所在层数。**不传(-1)="未指定"**——门槛全放开 + 色阶恒白，
+##   保持旧调用/旧测试不传层数时的行为（向后兼容）。真实层数请传 RunManager.current_layer()。
+##   min_layer 门槛过滤把池掏空时兜底放开门槛，不卡死掉落/商店。
+static func draw_draft(count: int, layer: int = -1) -> Array:
+	var pool: Array = Backpack.ITEMS.keys()
+	if layer >= 0:
+		var gated: Array = pool.filter(func(id): return Backpack.min_layer_of(id) <= layer)
+		if not gated.is_empty():
+			pool = gated
 	var result: Array = []
 	var n: int = min(count, pool.size())
 	for i in range(n):
 		var pick: String = _weighted_pick(pool)
 		if pick == "":
 			break
-		result.append(_drop_id(pick))
+		result.append(_drop_id(pick, layer))
 		pool.erase(pick)   # 不重复（按基础 id 去重，同基础物品同次不重复出现）
 	return result
 
-## 某基础物品的掉落实例 id：fixed_tier 物品固定色阶；其余（含 mergeable）恒掉白（tier0）。
-static func _drop_id(base_item_id: String) -> String:
-	var t: int = Backpack.fixed_tier_of(base_item_id)
-	return Backpack.tiered_id(base_item_id, t) if t >= 0 else base_item_id
+## 某基础物品的掉落实例 id：
+##   fixed_tier 机制类物品：固定色阶。
+##   mergeable 物品：layer<0(未指定)恒白；否则按 TIER_WEIGHTS_BY_LAYER 掷色阶。
+##   其余（如技能书）：恒白。
+static func _drop_id(base_item_id: String, layer: int) -> String:
+	var ft: int = Backpack.fixed_tier_of(base_item_id)
+	if ft >= 0:
+		return Backpack.tiered_id(base_item_id, ft)
+	if layer >= 0 and Backpack.is_mergeable(base_item_id):
+		return Backpack.tiered_id(base_item_id, _roll_drop_tier(layer))
+	return base_item_id
+
+
+## 按层数从 TIER_WEIGHTS_BY_LAYER 掷一个色阶。
+static func _roll_drop_tier(layer: int) -> int:
+	var weights: Dictionary = _weights_for_layer(layer)
+	var keys: Array = weights.keys()
+	var total: int = 0
+	for t in keys:
+		total += int(weights[t])
+	if total <= 0:
+		return 0
+	var roll: int = randi() % total
+	for t in keys:
+		roll -= int(weights[t])
+		if roll < 0:
+			return int(t)
+	return int(keys[keys.size() - 1])   # 兜底（理论不达）
+
+## 某层对应的色阶权重表（取第一个 max_layer≥层 的档）。
+static func _weights_for_layer(layer: int) -> Dictionary:
+	for cfg in TIER_WEIGHTS_BY_LAYER:
+		if layer <= int(cfg.get("max_layer", 999)):
+			return cfg.get("weights", { 0: 100 })
+	return { 0: 100 }
 
 
 ## 从候选 id 列表里按 rarity 权重随机取一个

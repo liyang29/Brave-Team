@@ -8,6 +8,14 @@ const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const LootTable = preload("res://scripts/systems/LootTable.gd")
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
 
+# MetaProgress 是跨局持久的 autoload，GUT 全程共享同一个实例——本文件用 _chain()+travel_to()
+# 走到较深的伪造层数（试图解锁书/职业），若不重置会把解锁状态"泄漏"给同文件的其它测试，
+# 造成结果跟测试执行顺序绑定。每条测试前重置，保证互相独立。
+# 关掉 autosave：默认存档路径就是玩家真实存档路径，测试解锁不该写进去。
+func before_each() -> void:
+	MetaProgress.reset()
+	MetaProgress.autosave = false
+
 # 注入一条确定的单后继链地图（types[0]→types[1]→…），当前节点 = 第 0 个。
 # 用于导航/房间/draft 单测，隔离随机生成的不确定性。
 func _chain(types: Array) -> void:
@@ -241,7 +249,9 @@ func test_enter_village_state_and_offers() -> void:
 	RunManager.enter_current_node()      # 起点是村庄
 	assert_eq(RunManager.state, RunManager.State.VILLAGE, "进村庄 → VILLAGE 状态")
 	assert_eq(RunManager.shop_stock.size(), RunManager.SHOP_STOCK_SIZE, "商店上货 6 件")
-	assert_eq(RunManager.tavern_offers.size(), RunManager.TAVERN_OFFERS, "招募上 3 候选")
+	# 招募候选 = 已解锁的职业数（局外成长起手锁盗贼/猎人）；TAVERN_OFFERS 只是"最多上几个"上限
+	var unlocked_classes: int = RunManager.HERO_TEMPLATES.keys().filter(func(id): return MetaProgress.is_unlocked(id)).size()
+	assert_eq(RunManager.tavern_offers.size(), unlocked_classes, "招募候选=当前已解锁的职业数")
 
 func test_buy_item_deducts_gold_and_stocks() -> void:
 	RunManager.start_run()

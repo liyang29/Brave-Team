@@ -104,6 +104,7 @@ func start_run(config: Dictionary = MapConfig.DEFAULT, seed: int = -1) -> void:
 	current_node_id = map["start_id"]                # 起点 = 第 0 层村庄
 	map_layers = int(map["layers"])
 	map_seed = int(map["seed"])
+	MetaProgress.record_layer(current_layer())       # 起手也算"到过第 0 层"（局外成长）
 	last_result = null
 	_set_state(State.MAP)
 
@@ -138,6 +139,7 @@ func travel_to(next_id: String) -> bool:
 		return false
 	current_node_id = next_id
 	node_changed.emit(current_node_id)
+	MetaProgress.record_layer(current_layer())   # 局外成长：刷新历史最深层，可能解锁新内容
 	enter_current_node()
 	return true
 
@@ -352,7 +354,9 @@ func leave_village() -> void:
 
 # 抽 n 个英雄池模板作候选（同一次不重复，避免同店出现两个同样的人）。
 func _roll_recruits(n: int) -> Array:
-	var ids: Array = HERO_TEMPLATES.keys()
+	# 只从"局外已解锁"的职业里抽（MetaProgress；未解锁的职业压根不会被招到，
+	# 想让玩家提前看到"还有职业待解锁"用 MetaProgress.locked_summary() 走 UI）。
+	var ids: Array = HERO_TEMPLATES.keys().filter(func(id): return MetaProgress.is_unlocked(id))
 	ids.shuffle()
 	return ids.slice(0, min(n, ids.size()))
 

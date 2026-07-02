@@ -21,7 +21,10 @@ var _gold_label: Label
 var _party_box: VBoxContainer
 var _recruit_box: VBoxContainer
 var _shop_box: VBoxContainer
+var _locked_box: VBoxContainer
 var _leave_btn: Button
+
+const META_TYPE_ZH := { "class": "职业", "item": "物品" }
 
 
 func _ready() -> void:
@@ -60,6 +63,11 @@ func _ready() -> void:
 	_shop_box.add_theme_constant_override("separation", 6)
 	root.add_child(_shop_box)
 
+	root.add_child(_section("待解锁（局外成长：这个存档历史最深打到过第几层，永久解锁，与本局输赢无关）"))
+	_locked_box = VBoxContainer.new()
+	_locked_box.add_theme_constant_override("separation", 4)
+	root.add_child(_locked_box)
+
 	root.add_child(HSeparator.new())
 
 	_leave_btn = Button.new()
@@ -87,6 +95,7 @@ func _refresh() -> void:
 	_refresh_party()
 	_refresh_recruit()
 	_refresh_shop()
+	_refresh_locked()
 	# 至少招满最小人数才能出发（1 人打不过第一关）
 	var can_leave: bool = RunManager.can_leave_village()
 	_leave_btn.text = "出发 ▶" if can_leave else "先招募至少 %d 人" % RunManager.MIN_PARTY_TO_LEAVE
@@ -165,6 +174,20 @@ func _refresh_shop() -> void:
 			call_deferred("_refresh"))
 		row.add_child(btn)
 		_shop_box.add_child(row)
+
+
+func _refresh_locked() -> void:
+	_clear(_locked_box)
+	var locked: Array = MetaProgress.locked_summary()
+	if locked.is_empty():
+		_locked_box.add_child(_dim("（全部解锁）"))
+		return
+	for entry in locked:
+		var l := Label.new()
+		l.text = "？？？·%s（跑局历史最深打到第 %d 层解锁，当前最深 %d）" % [
+			META_TYPE_ZH.get(entry["type"], entry["type"]), int(entry["layer"]), MetaProgress.best_layer_ever]
+		l.modulate = Color(0.5, 0.5, 0.58)
+		_locked_box.add_child(l)
 
 
 func _dim(t: String) -> Label:

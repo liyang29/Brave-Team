@@ -49,12 +49,15 @@ static func price(item_id: String) -> int:
 ## 按 rarity 权重抽 count 件不重复物品，返回 item_id 数组（池不够时尽量多给）。
 ## 掉落色阶三条路：fixed_tier 机制类物品固定色阶（不参与合成）；mergeable 物品按层数
 ## 掷色阶（深度掉落曲线，见 TIER_WEIGHTS_BY_LAYER）；其余（如技能书）恒白。
-## layer：调用方所在层数。**不传(-1)="未指定"**——门槛全放开 + 色阶恒白，
+## layer：调用方所在层数。**不传(-1)="未指定"**——门槛全放开 + 色阶恒白 + 不查局外解锁，
 ##   保持旧调用/旧测试不传层数时的行为（向后兼容）。真实层数请传 RunManager.current_layer()。
-##   min_layer 门槛过滤把池掏空时兜底放开门槛，不卡死掉落/商店。
+##   （局内深度门槛 min_layer 和局外解锁 MetaProgress 绑同一个开关：不知道"在哪一局的第几层"，
+##    也就没有真实玩家档可查解锁状态，两道门槛一起放开。）
+##   门槛过滤把池掏空时兜底放开门槛，不卡死掉落/商店。
 static func draw_draft(count: int, layer: int = -1) -> Array:
 	var pool: Array = Backpack.ITEMS.keys()
 	if layer >= 0:
+		pool = pool.filter(func(id): return MetaProgress.is_unlocked(id))
 		var gated: Array = pool.filter(func(id): return Backpack.min_layer_of(id) <= layer)
 		if not gated.is_empty():
 			pool = gated

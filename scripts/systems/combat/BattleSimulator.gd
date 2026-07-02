@@ -22,9 +22,12 @@ const SkillTableScript = preload("res://scripts/utils/SkillTable.gd")
 
 # ── 主入口 ────────────────────────────────────────────────────────────────────
 
-static func simulate(party, enemy_data_list: Array) -> BattleResult:
+## boss_config：可选，仅 Boss 节点用（见 EncounterData.gd 的 schema 说明）。
+## 缺省空字典 = 普通遭遇，行为与加 Boss 机制前完全一致（向后兼容，所有旧调用零改动）。
+static func simulate(party, enemy_data_list: Array, boss_config: Dictionary = {}) -> BattleResult:
 	var hero_bcs   = _create_hero_combatants(party.get_alive_heroes(), party)
 	var enemy_bcs  = _create_enemy_combatants(enemy_data_list)
+	_apply_boss_config(enemy_bcs, boss_config)
 	var turn_logs: Array = []
 	# 站位模式："reach"硬触及（默认）/ "soft_row"世界树软调整
 	var pos_mode: String = party.positioning_mode if party != null else "reach"
@@ -46,6 +49,10 @@ static func simulate(party, enemy_data_list: Array) -> BattleResult:
 		var _early_end = _check_end(hero_bcs, enemy_bcs, party, hero_bcs, enemy_bcs, enemy_data_list, turn_logs, turn)
 		if _early_end != null:
 			return _early_end
+
+		# Boss 召唤援军：新单位当回合就能行动（下面 all_units 在此之后才构建）
+		enemy_bcs.append_array(_check_boss_summons(enemy_bcs, turn, turn_logs))
+		hero_bcs.append_array(_check_boss_summons(hero_bcs, turn, turn_logs))
 
 		# ── 行动阶段：按速度排序 ──────────────────────────────────────────
 		var all_units: Array = []
@@ -143,6 +150,7 @@ static func _basic_attack(actor: BattleCombatant, target: BattleCombatant, pos_m
 	# 装备触发：攻击方 on_hit_dealt / 受击方 on_hit_taken / 击杀 on_kill
 	_process_equipment_triggers("on_hit_dealt", actor,  target, dmg, logs)
 	_process_equipment_triggers("on_hit_taken", target, actor,  dmg, logs)
+	_check_boss_phase(target, logs)   # 目标若是 Boss，受伤后检查是否跃迁阶段
 	if not target.is_alive():
 		_process_equipment_triggers("on_kill", actor, target, dmg, logs)
 		_notify_battle_event("on_kill", actor, { "target": target, "damage": dmg })
@@ -312,6 +320,7 @@ static func _execute_action(
 			logs.append(aoe_log)
 			_process_equipment_triggers("on_hit_dealt", actor, opp, actual_dmg, logs)
 			_process_equipment_triggers("on_hit_taken", opp, actor, actual_dmg, logs)
+			_check_boss_phase(opp, logs)   # AOE 命中的目标若是 Boss，同样检查阶段跃迁
 			if not opp.is_alive():
 				_process_equipment_triggers("on_kill", actor, opp, actual_dmg, logs)
 				_notify_battle_event("on_kill", actor, { "target": opp, "damage": actual_dmg })
@@ -347,6 +356,7 @@ static func _execute_action(
 		logs.append(log)
 		_process_equipment_triggers("on_hit_dealt", actor,  target, actual_dmg, logs)
 		_process_equipment_triggers("on_hit_taken", target, actor,  actual_dmg, logs)
+		_check_boss_phase(target, logs)   # 单体技能命中的目标若是 Boss，检查阶段跃迁
 		if not target.is_alive():
 			_process_equipment_triggers("on_kill", actor, target, actual_dmg, logs)
 			_notify_battle_event("on_kill", actor, { "target": target, "damage": actual_dmg })
@@ -456,6 +466,7 @@ static func _tick_all_status(units: Array, turn_logs: Array) -> void:
 			)
 			log.skill_id = "dot_tick"   # 特殊标记，BattleUI 显示为毒伤
 			turn_logs.append(log)
+			_check_boss_phase(unit, turn_logs)   # 毒伤也可能把 Boss 打过阶段阈值
 
 
 # ── 胜负检查（返回 BattleResult 或 null）────────────────────────────────────
@@ -542,6 +553,78 @@ static func _get_allies(unit: BattleCombatant, hero_bcs: Array, enemy_bcs: Array
 		return hero_bcs.filter(func(bc): return bc.is_alive())
 	else:
 		return enemy_bcs.filter(func(bc): return bc.is_alive())
+
+
+# ── Boss 机制：开局注入 / 阶段转换 / 召唤援军 ─────────────────────────────────
+
+## 开局把 boss_config 灌进对应下标的敌人单位：技能池/技能冷却/阶段表/召唤表 + 换上 BossStrategy。
+## boss_config 为空（绝大多数普通遭遇）= 空操作，enemy_bcs 完全不变。
+static func _apply_boss_config(enemy_bcs: Array, boss_config: Dictionary) -> void:
+	if boss_config.is_empty():
+		return
+	var idx: int = int(boss_config.get("boss_index", 0))
+	if idx < 0 or idx >= enemy_bcs.size():
+		push_warning("BattleSimulator: boss_config.boss_index=%d 越界（敌人数=%d）" % [idx, enemy_bcs.size()])
+		return
+	var boss: BattleCombatant = enemy_bcs[idx]
+	boss.available_skills = (boss_config.get("base_skills", []) as Array).duplicate()
+	boss.skill_cd_config  = (boss_config.get("skill_cds",   {}) as Dictionary).duplicate()
+	boss.boss_phases      = (boss_config.get("phases",      []) as Array).duplicate(true)
+	boss.boss_summons     = (boss_config.get("summons",     []) as Array).duplicate(true)
+	boss.combat_strategy  = BossStrategy.new()
+
+
+## Boss 受伤后调用：血量跌破下一个阈值就跃迁——属性乘倍率 + 解锁新技能。
+## boss_phases 按 hp_pct 从高到低排列，用 while 支持"一次重创跨过两个阈值"连续跃迁。
+static func _check_boss_phase(unit: BattleCombatant, turn_logs: Array) -> void:
+	if unit.boss_phases.is_empty() or not unit.is_alive():
+		return
+	while unit.boss_phase_index < unit.boss_phases.size():
+		var phase: Dictionary = unit.boss_phases[unit.boss_phase_index]
+		if unit.get_hp_percent() > float(phase.get("hp_pct", 0.0)):
+			break
+		var atk_mult: float = float(phase.get("atk_mult", 1.0))
+		var def_mult: float = float(phase.get("def_mult", 1.0))
+		unit.attack  = int(round(unit.attack  * atk_mult))
+		unit.magic   = int(round(unit.magic   * atk_mult))
+		unit.defense = int(round(unit.defense * def_mult))
+		for sid in phase.get("extra_skills", []):
+			if not unit.available_skills.has(sid):
+				unit.available_skills.append(sid)
+		var log := TurnLog.attack(unit.source_name, unit.source_name, 0)
+		log.skill_id = "boss_phase"   # 特殊标记，BattleUI 显示"阶段转换"
+		turn_logs.append(log)
+		unit.boss_phase_index += 1
+
+
+## 每回合开始调用一次：检查所有带 boss_summons 的存活单位是否该召援军。
+## 返回新生成的 BattleCombatant 数组（由调用方 append 进对应阵营列表）。
+static func _check_boss_summons(units: Array, turn: int, turn_logs: Array) -> Array:
+	var spawned: Array = []
+	for unit in units:
+		if not unit.is_alive() or unit.boss_summons.is_empty():
+			continue
+		for rule in unit.boss_summons:
+			var every: int = int(rule.get("every", 0))
+			if every <= 0 or turn % every != 0:
+				continue
+			var max_total: int = int(rule.get("max_total", 0))
+			var spawned_count: int = int(rule.get("_spawned_count", 0))
+			var remaining: int = max_total - spawned_count
+			if remaining <= 0:
+				continue
+			var group: Array = rule.get("group", [])
+			var take: int = mini(group.size(), remaining)
+			var to_spawn: Array = group.slice(0, take)
+			var new_bcs: Array = _create_enemy_combatants(MonsterFactory.create_group(to_spawn))
+			if new_bcs.is_empty():
+				continue
+			spawned.append_array(new_bcs)
+			rule["_spawned_count"] = spawned_count + new_bcs.size()
+			var log := TurnLog.attack(unit.source_name, unit.source_name, 0)
+			log.skill_id = "boss_summon"   # 特殊标记，BattleUI 显示"召唤援军"
+			turn_logs.append(log)
+	return spawned
 
 
 # ── 私有：创建战斗单位 ────────────────────────────────────────────────────────

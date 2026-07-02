@@ -11,6 +11,8 @@ extends GutTest
 const Loadout = preload("res://scripts/systems/backpack/BackpackLoadout.gd")
 const MapGenerator = preload("res://scripts/systems/run/MapGenerator.gd")
 const MapConfig = preload("res://scripts/systems/run/MapConfig.gd")
+const EncounterData = preload("res://scripts/systems/combat/EncounterData.gd")
+const Backpack = preload("res://scripts/systems/backpack/BackpackModel.gd")
 const TRIALS := 20
 
 # 平衡参考"难度阶梯"：固定的一条线（村庄→战→村→战→泉水→战→魔王），
@@ -329,6 +331,47 @@ func test_tier_merge_pressure() -> void:
 	gut.p("魔王战锐度：白装好build 平均%.1f回合/剩血%.0f%%  →  单件红装 平均%.1f回合/剩血%.0f%%" %
 		[gs["turns"], gs["hp_pct"] * 100, rs["turns"], rs["hp_pct"] * 100])
 	assert_gte(red, good, "红装不应弱于白装好build（合成应是正收益，数据看 gut.p 人工判断是否离谱）")
+
+
+# ── 中程 Boss 压测（好 build 按深度合成升阶，粗略量"打得过/有难度"）───────────
+# 好 build 装备原样是白装（tier 0），配深层 Boss 明显不够看；用 "@tier" 后缀模拟
+# "沿途合成升级过"的装备（tier_multiplier=2^tier），tier 随层数粗略估一个量级：
+# 20 层≈tier1(绿,×2)，30 层≈tier2(蓝,×4)，40 层≈tier3(紫,×8)。纯打尺子用，非精确经济模拟。
+func _tiered_grids(tier: int) -> Array:
+	var base := _good_grids()
+	if tier <= 0:
+		return base
+	var out: Array = []
+	for grid in base:
+		var g: Dictionary = {}
+		for pos in grid:
+			var item_id: String = grid[pos]
+			g[pos] = ("%s@%d" % [item_id, tier]) if Backpack.is_mergeable(item_id) else item_id
+		out.append(g)
+	return out
+
+func test_mid_boss_pressure() -> void:
+	var cases := [
+		{ "layer": 20, "tier": 1 },
+		{ "layer": 30, "tier": 2 },
+		{ "layer": 40, "tier": 3 },
+	]
+	gut.p("===== 中程 Boss 压测（合成升阶 build 满血单打 %d 次）=====" % TRIALS)
+	for c in cases:
+		var profile: Dictionary = EncounterData.profile_for_layer(c["layer"])
+		var wins := 0
+		var turns_sum := 0
+		for t in range(TRIALS):
+			var enemies: Array = MonsterFactory.create_group(profile["group"])
+			var tm: Dictionary = _team(_tiered_grids(c["tier"]))
+			var party: Party = Loadout.build_party(tm["loadouts"], tm["slots"], true)
+			var res: BattleResult = BattleSimulator.simulate(party, enemies, profile["boss_config"])
+			if res.party_won:
+				wins += 1
+			turns_sum += res.total_turns
+		gut.p("  L%-2d %-8s  胜率 %d/%d  平均 %.1f 回合" %
+			[c["layer"], profile["name"], wins, TRIALS, float(turns_sum) / TRIALS])
+	assert_true(true, "压测报告（看 gut.p 输出，人工判断难度是否合理）")
 
 
 func test_good_build_beats_bad_build() -> void:

@@ -19,12 +19,15 @@ const SCENE_REST      := "res://scenes/run/Rest.tscn"
 const SCENE_EVENT     := "res://scenes/run/Event.tscn"
 
 const REGISTRY: Dictionary = {
-	"battle":  { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
-	"elite":   { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },   # 精英：复用战斗管道，敌人更强/金币更多
-	"boss":    { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
-	"village": { "scene": SCENE_VILLAGE,   "state": "VILLAGE", "on_enter": "_enter_village" },
-	"rest":    { "scene": SCENE_REST,      "state": "REST" },
-	"event":   { "scene": SCENE_EVENT,     "state": "EVENT", "on_enter": "_enter_event" },
+	"battle":   { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
+	"elite":    { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },   # 精英：复用战斗管道，敌人更强/金币更多
+	# 中程Boss：复用战斗管道，跟 elite 一样不触发通关（只有 type=="boss" 才是唯一汇点/通关）。
+	# 打赢照常抽战利品回地图；区别只在敌人自带 boss_config（阶段转换/召唤援军，见 EncounterData）。
+	"mid_boss": { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
+	"boss":     { "scene": SCENE_ENCOUNTER, "state": "ENCOUNTER" },
+	"village":  { "scene": SCENE_VILLAGE,   "state": "VILLAGE", "on_enter": "_enter_village" },
+	"rest":     { "scene": SCENE_REST,      "state": "REST" },
+	"event":    { "scene": SCENE_EVENT,     "state": "EVENT", "on_enter": "_enter_event" },
 }
 
 # 未注册类型的兜底（当作普通战斗遭遇，避免崩溃）。

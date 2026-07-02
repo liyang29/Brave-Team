@@ -109,7 +109,8 @@ func _on_fight() -> void:
 		return
 	var party: Party = Loadout.build_party(alive_loadouts, RunManager.squad_slots, false)
 	var enemies: Array = RunManager.current_node().get("enemies", [])
-	var result: BattleResult = BattleSimulator.simulate(party, enemies)
+	var boss_config: Dictionary = RunManager.current_node().get("boss_config", {})
+	var result: BattleResult = BattleSimulator.simulate(party, enemies, boss_config)
 	_render_result(result)
 
 

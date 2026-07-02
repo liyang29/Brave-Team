@@ -79,10 +79,27 @@ var can_reach_back: bool = false
 
 # ── 技能回合冷却（方案 B：技能书）────────────────────────────────────────────
 # skill_cd_config : { skill_id: cd_turns } —— 由背包技能书注入（经 Party）。空=无冷却。
+#                   Boss 的技能冷却也走这个字段（EncounterData.boss_config.skill_cds 注入）。
 # skill_cooldowns : { skill_id: remaining } —— 运行时剩余冷却回合，行动开始递减。
 # 默认两者皆空 → 所有技能无冷却 → 旧战斗行为完全不变。
 var skill_cd_config: Dictionary = {}
 var skill_cooldowns: Dictionary = {}
+
+
+# ── Boss 机制（方案：阶段转换 + 召唤援军，EncounterData.boss_config 注入）────────
+# 默认三者皆空 → 非 Boss 单位零影响，跟普通敌人行为完全一致。
+#
+# available_skills : Array[String] —— Boss 当前"会放"的技能池（BossStrategy 从这里选技，
+#                     不是像英雄那样读背包）。初始 = boss_config.base_skills；阶段转换会追加新技能。
+# boss_phases      : Array[{hp_pct,atk_mult,def_mult,extra_skills}] —— 血量阈值→效果，
+#                     按 hp_pct 从高到低排列。BattleSimulator 每次受伤后检查是否该跃迁。
+# boss_phase_index : 已跃迁到第几个阈值（0=还没跃迁过任何一个）。
+# boss_summons     : Array[{every,group,max_total,_spawned_count}] —— 每 N 回合召一批新怪，
+#                     召满 max_total 停止。_spawned_count 是运行时累计计数（战斗内私有）。
+var available_skills: Array = []
+var boss_phases: Array = []
+var boss_phase_index: int = 0
+var boss_summons: Array = []
 
 
 # ── 副属性字典（方案 B：可扩展战斗属性的地基）──────────────────────────────

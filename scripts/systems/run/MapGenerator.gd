@@ -19,6 +19,7 @@ extends RefCounted
 
 const MapConfig = preload("res://scripts/systems/run/MapConfig.gd")
 const NodeTypes = preload("res://scripts/systems/run/NodeTypes.gd")
+const EncounterData = preload("res://scripts/systems/combat/EncounterData.gd")
 
 
 ## 生成一张地图。seed<0 = 随机种子（并回填到结果，便于复现/存档）。
@@ -36,11 +37,15 @@ static func generate(config: Dictionary = MapConfig.DEFAULT, seed: int = -1) -> 
 	var W: int = max(1, int(config.get("max_width", 4)))
 	var fixed: Dictionary = config.get("fixed", {})
 	var nodes: Dictionary = {}
+	var mid_boss_layers: Array = config.get("mid_boss_layers", [])
 
 	# 1. 固定锚点
 	var start_id := _make(nodes, 0, 0, String(fixed.get("first", "village")))
 	_make(nodes, L - 2, 0, String(fixed.get("pre_boss", "rest")))   # 魔王前一层：泉水（funnel）
 	_make(nodes, L - 1, 0, String(fixed.get("last", "boss")))       # 末层：魔王（唯一汇点）
+	for layer in mid_boss_layers:                                   # 中程 Boss：每层单节点 funnel（同 pre_boss/boss）
+		if layer > 0 and layer < L - 2:
+			_make(nodes, layer, 0, "mid_boss")
 
 	# 2. 铺路径
 	var paths: int = max(1, int(config.get("paths", 6)))
@@ -49,7 +54,7 @@ static func generate(config: Dictionary = MapConfig.DEFAULT, seed: int = -1) -> 
 		var prev_col := 0
 		for layer in range(1, L):
 			var col := 0
-			if layer < L - 2:                       # L-2/L-1 是单节点 funnel（col 恒 0）
+			if layer < L - 2 and not (layer in mid_boss_layers):    # L-2/L-1/中程Boss层 是单节点 funnel（col 恒 0）
 				col = clampi(prev_col + rng.randi_range(-1, 1), 0, W - 1)
 			var id := _node_id(layer, col)
 			if not nodes.has(id):
@@ -145,6 +150,12 @@ static func _fill_content(n: Dictionary, config: Dictionary, rng: RandomNumberGe
 			n["name"] = _pick_name(names, "elite", rng, "精英战")
 			n["enemies"] = MonsterFactory.create_group(_pick_group(config.get("elite_tiers", []), layer, rng))
 			n["gold"] = int(gold.get("elite", 45))
+		"mid_boss":
+			var profile: Dictionary = EncounterData.profile_for_layer(layer)
+			n["name"] = String(profile.get("name", "中程Boss"))
+			n["enemies"] = MonsterFactory.create_group(profile.get("group", []))
+			n["gold"] = int(profile.get("gold", gold.get("mid_boss", 70)))
+			n["boss_config"] = profile.get("boss_config", {})
 		_:  # battle（含未知类型兜底）
 			n["name"] = _pick_name(names, "battle", rng, "遭遇")
 			n["enemies"] = MonsterFactory.create_group(_pick_group(config.get("battle_tiers", []), layer, rng))

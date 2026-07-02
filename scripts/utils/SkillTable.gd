@@ -288,6 +288,39 @@ const SKILLS: Dictionary = {
 		"aoe":        true,
 		"aoe_shape":  "column",
 	},
+
+	# ── 中程 Boss 专属技能（EncounterData 引用；不参与蓝量系统，靠 cd 节流）─────
+	"boss_smash": {
+		"name_zh":    "石破天惊",
+		"type":       "damage",
+		"mp_cost":    0,
+		"power":      2.2,
+		"use_magic":  false,
+		"stun_turns": 1,
+	},
+	"boss_venom_nova": {
+		"name_zh":    "剧毒新星",
+		"type":       "damage",
+		"mp_cost":    0,
+		"power":      1.0,
+		"use_magic":  true,
+		"aoe":        true,
+	},
+	"boss_frenzy": {
+		"name_zh":      "深渊狂暴",
+		"type":         "buff_self",
+		"mp_cost":      0,
+		"buff_attack":  10,
+		"buff_turns":   -1,
+	},
+	"boss_abyss_strike": {
+		"name_zh":     "深渊一击",
+		"type":        "damage",
+		"mp_cost":     0,
+		"power":       2.5,
+		"use_magic":   true,
+		"ignore_def":  true,
+	},
 }
 
 

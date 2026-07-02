@@ -103,7 +103,35 @@ func test_battle_nodes_have_enemies() -> void:
 		var nodes: Dictionary = MapGenerator.generate(MapConfig.DEFAULT, s)["nodes"]
 		for id in nodes:
 			var t: String = nodes[id]["type"]
-			if t in ["battle", "elite", "boss"]:
+			if t in ["battle", "elite", "boss", "mid_boss"]:
 				assert_false((nodes[id]["enemies"] as Array).is_empty(), "seed %d：%s 节点有敌人" % [s, t])
 			else:
 				assert_true((nodes[id]["enemies"] as Array).is_empty(), "seed %d：非战斗节点 %s 无敌人" % [s, t])
+
+func test_mid_boss_appears_exactly_at_configured_layers() -> void:
+	var mid_layers: Array = MapConfig.DEFAULT.get("mid_boss_layers", [])
+	assert_false(mid_layers.is_empty(), "DEFAULT 配置了中程 Boss 层")
+	for s in SEEDS:
+		var nodes: Dictionary = MapGenerator.generate(MapConfig.DEFAULT, s)["nodes"]
+		var found_layers: Array = []
+		for id in nodes:
+			if nodes[id]["type"] == "mid_boss":
+				found_layers.append(int(nodes[id]["layer"]))
+				assert_eq(int(nodes[id]["col"]), 0, "seed %d：中程 Boss 层是单节点 funnel（col=0）" % s)
+		found_layers.sort()
+		assert_eq(found_layers, mid_layers, "seed %d：中程 Boss 恰好出现在配置的层" % s)
+
+func test_mid_boss_node_carries_boss_config() -> void:
+	for s in SEEDS:
+		var nodes: Dictionary = MapGenerator.generate(MapConfig.DEFAULT, s)["nodes"]
+		for id in nodes:
+			if nodes[id]["type"] == "mid_boss":
+				var bc: Dictionary = nodes[id].get("boss_config", {})
+				assert_false(bc.is_empty(), "seed %d：中程 Boss 节点 %s 带 boss_config" % [s, id])
+				assert_true(bc.has("base_skills"), "seed %d：boss_config 含 base_skills" % s)
+
+func test_non_mid_boss_nodes_have_no_boss_config() -> void:
+	var map := MapGenerator.generate(MapConfig.DEFAULT, 42)
+	for id in map["nodes"]:
+		if map["nodes"][id]["type"] != "mid_boss":
+			assert_false((map["nodes"][id] as Dictionary).has("boss_config"), "非中程 Boss 节点不带 boss_config 字段")

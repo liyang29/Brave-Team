@@ -46,11 +46,10 @@
 - **建议**:逐步拆 `MapGenerator`/`EncounterData`/`ShopService` 到 `systems/run/`,RunManager 只当状态机协调者。
 - **证据**:`scripts/autoload/RunManager.gd`(`HERO_TEMPLATES`、`_build_map`、商店/酒馆逻辑都内联)。
 
-### R6. 战斗输入太薄,只有 enemy_data_list　⬜
-- **问题**:`simulate(party, enemy_data_list)` 只吃敌人列表。未来的敌人布局、多波次、战场 modifier、非"全歼"胜利条件(护送/存活 N 回合)无处安放。
-- **建议**:引入 `EncounterData`(敌人 + 布局 + 修正 + 胜利条件)当战斗入口包装,`simulate` 签名不必反复改。现在做很便宜。
-- **附**:`BattleSimulator` 已 ~720 行,机制(暴击/闪避/嘲讽/站位/AOE/触发)全内联;AI 用策略模式拆了但机制没有。关键词再多可考虑抽"关键词/效果注册表"(参照 `equipment_triggers`)。
-- **⚠️ 优先级升级(2026-07-02)**:压测三次(好build/多书连招/色阶合成)都验证"顶级 build 让魔王形同虚设",下一步要做 Boss 机制(援军/多阶段)——这条从"不急,盯着"变成**前置阻塞项**,建 `EncounterData` 是做 Boss 机制的第一步,不是可选优化。
+### R6. 战斗输入太薄,只有 enemy_data_list　✅ 已修(2026-07-02,最小子集)
+- **原问题**:`simulate(party, enemy_data_list)` 只吃敌人列表。未来的敌人布局、多波次、战场 modifier、非"全歼"胜利条件(护送/存活 N 回合)无处安放。压测三次(好build/多书连招/色阶合成)都验证"顶级 build 让魔王形同虚设",Boss 机制成前置阻塞项。
+- **已做(范围收窄版,非完整 R6 愿景)**:`EncounterData.gd`(新文件)只解决"这场战斗的 Boss 是谁、有没有阶段转换/召唤援军",`simulate()` 加可选第三参数 `boss_config:Dictionary={}`(缺省空=向后兼容零改动)。**非全歼胜利条件(护送/存活N回合)仍未做**,留到真需要时再扩这个口子。
+- **附**:`BattleSimulator` 现 ~800 行(新增阶段转换/召唤援军引擎),机制(暴击/闪避/嘲讽/站位/AOE/触发/Boss阶段/召唤)全内联;AI 用策略模式拆了但机制没有。关键词再多可考虑抽"关键词/效果注册表"(参照 `equipment_triggers`)。
 
 ### R7. 数据模型对"存档"不友好(潜在雷)　⬜
 - **问题**:roster 装 `Hero` 对象引用,`squad_slots` 用 `Vector2i → Hero 引用` 当键值,`grid` 用 `Vector2i` 当键——**对象引用和 Vector2i 键都不好 JSON 序列化**。roguelike 迟早要存盘,现结构不是按可序列化设计的。
@@ -69,7 +68,7 @@
 
 1. ✅ **R4**(`_advance`,几行)
 2. ✅ **R3**(节点类型注册表)
-3. ⬜ **R6**(`EncounterData` 包战斗输入)
+3. ✅ **R6**(`EncounterData` 包战斗输入,最小子集,2026-07-02)
 4. ✅ **R2**(图模型 + `MapGenerator` + 分支地图,2026-07-01)
 5. ⬜ **R1**(物品系统统一)— 可独立挑时间做
 6. ⬜ **R5/R7/R8** — 随 存档/meta/事件 需求到来时一并处理

@@ -27,6 +27,12 @@ const ENEMIES: Dictionary = {
 	"demon_lord":  { "name": "魔王", "hp": 238, "atk": 21, "def": 11, "spd": 10 },
 	"claw_minion": { "name": "爪牙", "hp": 90,  "atk": 13, "def": 4, "spd": 9 },
 
+	# ── 中程 Boss（层20/30/40，EncounterData 引用；skip_types 内不吃深度缩放，
+	#    数值手调、自成一档，不随层数再叠一层放大）────────────────────────────
+	"stone_guard_king": { "name": "石卫王",   "hp": 450, "atk": 26, "def": 14, "spd": 8 },
+	"venom_lord":       { "name": "毒沼领主", "hp": 520, "atk": 24, "def": 12, "spd": 11, "magic": 30, "row": "back", "ranged": true },
+	"abyss_overlord":   { "name": "深渊统领", "hp": 650, "atk": 32, "def": 16, "spd": 10, "magic": 34, "row": "back", "ranged": true },
+
 	# ── 实验场景用（前排蛮兵 + 后排巫师）──────────────────────────────────────
 	"brute":     { "name": "蛮兵",   "hp": 90, "atk": 15, "def": 6, "spd": 8, "ai": EnemyData.AI_AGGRESSIVE },
 	"dark_mage": { "name": "黑巫师", "hp": 60, "atk": 17, "def": 3, "spd": 11, "row": "back", "ranged": true, "ai": EnemyData.AI_SPELLCASTER },

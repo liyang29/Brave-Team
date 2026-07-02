@@ -49,7 +49,8 @@
 ### R6. 战斗输入太薄,只有 enemy_data_list　⬜
 - **问题**:`simulate(party, enemy_data_list)` 只吃敌人列表。未来的敌人布局、多波次、战场 modifier、非"全歼"胜利条件(护送/存活 N 回合)无处安放。
 - **建议**:引入 `EncounterData`(敌人 + 布局 + 修正 + 胜利条件)当战斗入口包装,`simulate` 签名不必反复改。现在做很便宜。
-- **附**:`BattleSimulator` 已 ~630 行,机制(暴击/闪避/嘲讽/站位/AOE/触发)全内联;AI 用策略模式拆了但机制没有。关键词再多可考虑抽"关键词/效果注册表"(参照 `equipment_triggers`)。不急,盯着。
+- **附**:`BattleSimulator` 已 ~720 行,机制(暴击/闪避/嘲讽/站位/AOE/触发)全内联;AI 用策略模式拆了但机制没有。关键词再多可考虑抽"关键词/效果注册表"(参照 `equipment_triggers`)。
+- **⚠️ 优先级升级(2026-07-02)**:压测三次(好build/多书连招/色阶合成)都验证"顶级 build 让魔王形同虚设",下一步要做 Boss 机制(援军/多阶段)——这条从"不急,盯着"变成**前置阻塞项**,建 `EncounterData` 是做 Boss 机制的第一步,不是可选优化。
 
 ### R7. 数据模型对"存档"不友好(潜在雷)　⬜
 - **问题**:roster 装 `Hero` 对象引用,`squad_slots` 用 `Vector2i → Hero 引用` 当键值,`grid` 用 `Vector2i` 当键——**对象引用和 Vector2i 键都不好 JSON 序列化**。roguelike 迟早要存盘,现结构不是按可序列化设计的。

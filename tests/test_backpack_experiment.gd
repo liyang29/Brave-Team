@@ -198,77 +198,37 @@ func test_taunt_only_works_in_front_row() -> void:
 		"嘲讽位站前排 → 重新被优先锁定")
 
 
-# ── 选技：确定性 + 只在可放池里挑（替掉纯随机，CD 不再浪费出技骰子）──────────
+# ── 连招条件门 should_cast（英雄走连招后，选技唯一入口；替代旧的 choose_skill 单选）──
+# choose_skill() 已从 5 个英雄策略删除（英雄回合只调 should_cast，见 _hero_combo_turn）；
+# 下面直接测 should_cast 的条件门，覆盖旧测试验证过的行为保证。
 
-func test_castable_skills_excludes_cd_and_low_mp() -> void:
-	var hero := _hero(Hero.HeroClass.WARRIOR, ["slash", "cleave"])   # slash 蓝10 / cleave 蓝30
+func test_warrior_should_cast_taunt_only_front_and_untaunted() -> void:
 	var strat := WarriorStrategy.new()
 	var w := BattleCombatant.new()
-	w.max_mp = 100; w.current_mp = 100
-	var pool := strat._castable_skills(w, hero)
-	assert_true("slash" in pool and "cleave" in pool, "满蓝无冷却 → 两个都可放")
-	# 冷却中的被排除
-	w.skill_cd_config = { "cleave": 2 }
-	w.trigger_skill_cooldown("cleave")
-	assert_false("cleave" in strat._castable_skills(w, hero), "冷却中的不在可放池")
-	# 蓝量不足的被排除
-	w.skill_cooldowns = {}
-	w.current_mp = 12   # 够 slash(10) 不够 cleave(30)
-	var pool2 := strat._castable_skills(w, hero)
-	assert_true("slash" in pool2, "蓝够 → slash 可放")
-	assert_false("cleave" in pool2, "蓝不够 → cleave 不可放")
-
-
-func test_skill_never_returns_on_cooldown() -> void:
-	# 核心修复：选技绝不返回冷却中的技能（旧版会抽中后浪费成普攻）
-	var hero := _hero(Hero.HeroClass.MAGE, ["fireball", "ice_lance"])
-	var strat := MageStrategy.new()
-	var m := BattleCombatant.new()
-	m.max_mp = 100; m.current_mp = 100
-	m.skill_cd_config = { "fireball": 2, "ice_lance": 2 }
-	m.trigger_skill_cooldown("fireball")
-	m.trigger_skill_cooldown("ice_lance")
-	for i in range(50):
-		assert_eq(strat.choose_skill(m, hero, []), "", "技能全在冷却 → 只普攻，绝不返回冷却技能")
-
-
-func test_warrior_prioritizes_taunt_when_front() -> void:
-	var hero := _hero(Hero.HeroClass.WARRIOR, ["taunt_roar", "slash", "cleave"])
-	var strat := WarriorStrategy.new()
-	var w := BattleCombatant.new()
-	w.row = "front"; w.max_mp = 50; w.current_mp = 50
-	# 确定性：前排 + 未在嘲讽 + 挑衅可放 → 必出挑衅怒吼
-	assert_eq(strat.choose_skill(w, hero, []), "taunt_roar", "前排战士确定性优先拉仇")
-	# 已在嘲讽中 → 不重复拉仇（转去概率攻击或普攻，绝不再返回 taunt_roar）
+	w.row = "front"
+	assert_true(strat.should_cast("taunt_roar", w, null, [], []), "前排+未嘲讽 → 可放拉仇")
 	w.apply_taunt(2)
-	for i in range(30):
-		assert_ne(strat.choose_skill(w, hero, []), "taunt_roar", "已在嘲讽中不重复拉仇")
+	assert_false(strat.should_cast("taunt_roar", w, null, [], []), "已在嘲讽中 → 不重复拉仇")
 
-
-func test_hero_skill_is_deterministic_strongest() -> void:
-	# 确定性：可放时必出最强伤害技（火球 2.0 > 冰枪 1.5），不再掷骰
-	var hero := _hero(Hero.HeroClass.MAGE, ["fireball", "ice_lance"])
-	var strat := MageStrategy.new()
-	var m := BattleCombatant.new()
-	m.max_mp = 100; m.current_mp = 100
-	for i in range(20):
-		assert_eq(strat.choose_skill(m, hero, [], []), "fireball", "可放时必出最强(火球)")
-	# 火球进冷却 → 退而求其次放冰枪
-	m.skill_cd_config = { "fireball": 2 }
-	m.trigger_skill_cooldown("fireball")
-	assert_eq(strat.choose_skill(m, hero, [], []), "ice_lance", "火球冷却 → 放冰枪")
-
-
-func test_warrior_cleave_when_multiple_enemies() -> void:
-	# 不带挑衅书 → 跳过拉仇，直接看攻击优先级：敌≥2 横扫 / 单体斩击
-	var hero := _hero(Hero.HeroClass.WARRIOR, ["slash", "cleave"])
+func test_warrior_should_cast_taunt_false_when_back_row() -> void:
 	var strat := WarriorStrategy.new()
 	var w := BattleCombatant.new()
-	w.row = "front"; w.max_mp = 100; w.current_mp = 100
+	w.row = "back"
+	assert_false(strat.should_cast("taunt_roar", w, null, [], []), "后排拉仇无效 → 不放")
+
+func test_warrior_should_cast_cleave_only_when_multi_enemy() -> void:
+	var strat := WarriorStrategy.new()
+	var w := BattleCombatant.new()
 	var e1 := BattleCombatant.new()
 	var e2 := BattleCombatant.new()
-	assert_eq(strat.choose_skill(w, hero, [], [e1, e2]), "cleave", "敌≥2 → 横扫")
-	assert_eq(strat.choose_skill(w, hero, [], [e1]), "slash", "单敌 → 斩击")
+	assert_true(strat.should_cast("cleave", w, null, [], [e1, e2]), "敌≥2 → 可放横扫")
+	assert_false(strat.should_cast("cleave", w, null, [], [e1]), "单敌 → 横扫不划算，不放")
+
+func test_warrior_should_cast_slash_always_true() -> void:
+	# 纯伤害技无额外条件门，就绪即放（继承基类默认 true）
+	var strat := WarriorStrategy.new()
+	var w := BattleCombatant.new()
+	assert_true(strat.should_cast("slash", w, null, [], []), "斩击无条件门，就绪即放")
 
 
 func test_aura_scope_note_self_inclusion() -> void:
@@ -322,16 +282,6 @@ func test_combo_basic_attack_when_no_skill_ready() -> void:
 	BattleSimulator._hero_combo_turn(w, hero, [w], [e], "soft_row", logs)
 	assert_eq(logs.size(), 1, "无就绪技能 → 只一次行动")
 	assert_true(logs[0].skill_id.is_empty(), "且是普攻（skill_id 空）")
-
-
-func test_warrior_back_row_never_taunts() -> void:
-	var hero := _hero(Hero.HeroClass.WARRIOR, ["taunt_roar"])   # 只带挑衅书
-	var strat := WarriorStrategy.new()
-	var w := BattleCombatant.new()
-	w.row = "back"; w.max_mp = 50; w.current_mp = 50
-	# 后排拉仇无效 → 跳过；攻击池里也没伤害技 → 只会普攻，绝不空放挑衅
-	for i in range(30):
-		assert_eq(strat.choose_skill(w, hero, []), "", "后排战士不放挑衅怒吼（拉仇无效）")
 
 
 # ── 世界树式软站位 ────────────────────────────────────────────────────────────
@@ -501,7 +451,7 @@ func _run(grids: Array) -> int:
 			h.set("base_mp", int(base["mp"]))
 			h.stat_block.rebuild()
 			h.current_hp = h.get_max_hp()
-		var party: Party = Party.create(heroes, null, 0.4)
+		var party: Party = Party.create(heroes)
 		for i in range(heroes.size()):
 			party.set_row(heroes[i], bases[i]["row"])
 		var result: BattleResult = BattleSimulator.simulate(party, _enemies())

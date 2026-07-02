@@ -225,7 +225,7 @@ func _on_fight() -> void:
 		h.current_hp = h.get_max_hp()
 		heroes.append(h)
 
-	var party: Party = Party.create(heroes, null, 0.4)
+	var party: Party = Party.create(heroes)
 	for entry in selected:
 		var r: String = "back" if entry["row_btn"].text == "后排" else "front"
 		party.set_row(entry["hero"], r)

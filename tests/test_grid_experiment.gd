@@ -62,7 +62,7 @@ func _run(placement: Array) -> Dictionary:
 		for p in placement:
 			p["hero"].current_hp = p["hero"].get_max_hp()
 			heroes.append(p["hero"])
-		var party: Party = Party.create(heroes, null, 0.4)
+		var party: Party = Party.create(heroes)
 		for p in placement:
 			party.set_cell(p["hero"], p["col"], p["row"])
 		var result: BattleResult = BattleSimulator.simulate(party, _encounter())

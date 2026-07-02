@@ -5,12 +5,8 @@ class_name MageStrategy extends CombatStrategy
 #
 # 定位：远程法术，高魔低防，消灭软目标
 # 目标选择：攻击防御最低的敌人（找最容易穿透的目标）
-# 技能使用：70% 概率释放魔法技能（法师的核心输出手段）
+# 技能走连招模型（继承基类 should_cast：纯伤害技就绪即放，无额外条件）。
 # ─────────────────────────────────────────────────────────────────────────────
 
 func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatant:
 	return _target_lowest_defense(opponents)
-
-# 确定性：蓝够、转好就放最强法术（火球 > 冰枪）；都不可放 → 普攻
-func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
-	return _strongest_castable_damage(self_bc, hero_ref)

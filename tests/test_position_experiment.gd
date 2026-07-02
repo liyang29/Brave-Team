@@ -70,7 +70,7 @@ func _run(heroes: Array) -> Dictionary:
 	for i in TRIALS:
 		for h in heroes:
 			h.current_hp = h.get_max_hp()
-		var party: Party = Party.create(heroes, null, 0.4)
+		var party: Party = Party.create(heroes)
 		var result: BattleResult = BattleSimulator.simulate(party, _encounter())
 		if result.party_won:
 			wins += 1

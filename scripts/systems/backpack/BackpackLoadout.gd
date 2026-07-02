@@ -123,7 +123,7 @@ static func build_party(loadouts: Array, squad_slots: Dictionary, full_heal: boo
 		extra_map[hero] = b["extra"]
 		heroes.append(hero)
 
-	var party: Party = Party.create(heroes, null, 0.4)
+	var party: Party = Party.create(heroes)
 	party.positioning_mode = "soft_row"
 	# 站位：来自 squad_slots（只认前/后排，列不计入战斗）
 	for cell in squad_slots:

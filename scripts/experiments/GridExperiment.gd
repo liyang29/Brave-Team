@@ -324,7 +324,7 @@ func _on_fight() -> void:
 		h.current_hp = h.get_max_hp()
 		heroes.append(h)
 
-	var party: Party = Party.create(heroes, null, 0.4)
+	var party: Party = Party.create(heroes)
 	for cell in _placement:
 		var h: Hero = _placement[cell]
 		var row_str: String = ROWS[cell.y]

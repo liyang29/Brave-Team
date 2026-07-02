@@ -1,8 +1,5 @@
 class_name CombatStrategy extends RefCounted
 
-# SkillTable 用 preload 引入（读 mp_cost 判断可放性），避免全局类缓存时序问题
-const SkillTableScript = preload("res://scripts/utils/SkillTable.gd")
-
 # ─────────────────────────────────────────────────────────────────────────────
 # CombatStrategy — 战斗决策策略基类（Strategy 模式）
 #
@@ -10,10 +7,11 @@ const SkillTableScript = preload("res://scripts/utils/SkillTable.gd")
 # 不应该充满 if hero_class == WARRIOR 这类判断。
 # 策略模式把"如何决策"封装进各自的子类，Simulator 只调用统一接口。
 #
-# 使用方式：
-#   - 英雄由 HeroFactory 根据职业注入对应策略（WarriorStrategy 等）
-#   - 敌人由 EnemyAIFactory.create(ai_type) 创建对应策略
-#   - BattleSimulator 统一调用 strategy.choose_target() 和 choose_skill()
+# 使用方式（英雄/敌人走两条不同路径，见 BattleSimulator.simulate）：
+#   - 英雄：连招模型，_hero_combo_turn 按背包读序遍历技能，只调 should_cast()
+#     判"这个就绪技能现在该不该放"；choose_skill() 不用于英雄（无单选优先级概念）。
+#   - 敌人：单动作模型，走 choose_target() + choose_skill() 选一个技能/普攻。
+#     由 EnemyAIFactory.create(ai_type) 按 EnemyData.ai_type 注入对应策略。
 #
 # 子类只需要 override 需要改变的方法，其余继承默认行为。
 # ─────────────────────────────────────────────────────────────────────────────
@@ -30,14 +28,14 @@ func choose_target(self_bc: BattleCombatant, opponents: Array) -> BattleCombatan
 	return opponents[0]
 
 
-# choose_skill：决定本回合使用哪个技能
+# choose_skill：决定本回合使用哪个技能（仅敌人单动作路径调用；英雄走连招+should_cast，不用此接口）
 #
 # 参数：
 #   self_bc : 自身的 BattleCombatant（可用于读取 HP、MP 等）
 #   hero_ref: 原始英雄对象（用于读取 skills 列表）；敌人传 null
 #   allies  : 同队存活单位列表（用于牧师等支援职业判断友军状态）
 # 返回：技能 ID 字符串；空字符串 = 普通攻击
-# 默认行为：普通攻击（子类按概率 override 选择技能）
+# 默认行为：普通攻击（敌人策略子类按各自 AI 逻辑 override）
 func choose_skill(self_bc: BattleCombatant, hero_ref, allies: Array = [], opponents: Array = []) -> String:
 	return ""
 
@@ -100,40 +98,3 @@ func _target_highest_attack(opponents: Array) -> BattleCombatant:
 # 当前所有策略为空实现，框架可用，逻辑待被动技能系统接入后填充。
 func on_battle_event(_event: String, _self_bc: BattleCombatant, _context: Dictionary) -> void:
 	pass
-
-
-# ── 技能可放性 & 选技（英雄：确定性 / 可放就放，蓝量+CD 当唯一节流阀）──────────
-# 设计原则：本作是构筑游戏，玩家唯一的杆是搭背包 → 战斗要"可读"：配了什么书，
-# 蓝够、转好就放什么，不再掷骰子。蓝量消耗 + 回合冷却本身就是天然节流。
-# （敌人 AI 保持各自的随机/特定逻辑——不可预测对"敌人"是优点。）
-
-## 单个技能现在能不能放（不在冷却 + 蓝量足够）
-func _is_castable(self_bc: BattleCombatant, skill_id: String) -> bool:
-	if self_bc.is_skill_on_cooldown(skill_id):
-		return false
-	var mp_cost: int = int(SkillTableScript.get_skill(skill_id).get("mp_cost", 0))
-	return self_bc.current_mp >= mp_cost
-
-## 英雄当前【可放】的技能子集（已学 + 不在冷却 + 蓝够）
-func _castable_skills(self_bc: BattleCombatant, hero_ref) -> Array:
-	if hero_ref == null:
-		return []
-	var skills = hero_ref.get("skills")
-	if skills == null:
-		return []
-	return skills.filter(func(sid): return _is_castable(self_bc, sid))
-
-## 可放的【伤害】技能里 power 最高的一个（确定性"放最强可用攻击技"）；无 → 普攻("")。
-## 拉仇/buff/治疗等非伤害技由各职业策略按优先级单独处理，不进这里。
-func _strongest_castable_damage(self_bc: BattleCombatant, hero_ref) -> String:
-	var best := ""
-	var best_power := -1.0
-	for sid in _castable_skills(self_bc, hero_ref):
-		var s: Dictionary = SkillTableScript.get_skill(sid)
-		if s.get("type", "damage") != "damage":
-			continue
-		var p: float = float(s.get("power", 1.0))
-		if p > best_power:
-			best_power = p
-			best = sid
-	return best

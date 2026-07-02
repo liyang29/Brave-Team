@@ -56,7 +56,7 @@ func _party(hp: int = 200, atk: int = 50, def_val: int = 10) -> Party:
 	hero.current_hp     = hp
 	hero.base_attack    = atk
 	hero.base_defense   = def_val
-	return Party.create([hero], null, 0.4)
+	return Party.create([hero])
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -423,7 +423,7 @@ func test_simulate_multiple_heroes_vs_multiple_enemies() -> void:
 		h.current_hp   = 500
 		h.base_attack  = 100
 		h.base_defense = 20
-	var party   = Party.create([hero1, hero2, hero3], null, 0.4)
+	var party   = Party.create([hero1, hero2, hero3])
 	var enemies = [_enemy(30, 10, 0), _enemy(30, 10, 0), _enemy(30, 10, 0)]
 	var result  = BattleSimulator.simulate(party, enemies)
 	assert_not_null(result, "多对多战斗应返回非空结果")

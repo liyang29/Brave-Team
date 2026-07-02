@@ -22,6 +22,15 @@ var _badge: Label      # 右下角数量角标（公共装备栏用）
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_ensure_children()
+
+
+## 懒建子节点：不依赖 _ready() 的时机——调用方可能在把本节点 add_child 进树【之前】
+## 就调 set_display()（比如批量构建时先设值再挂树），_label 若只在 _ready() 建，
+## 那种时序下会静默丢字（_label 还是 null，set_display 的 if _label: 直接跳过）。
+func _ensure_children() -> void:
+	if _label:
+		return
 	_label = Label.new()
 	_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -39,11 +48,10 @@ func _ready() -> void:
 
 
 func set_display(text: String, color: Color, badge: String = "") -> void:
-	if _label:
-		_label.text = text
-		_label.modulate = color
-	if _badge:
-		_badge.text = badge
+	_ensure_children()
+	_label.text = text
+	_label.modulate = color
+	_badge.text = badge
 
 
 # ── Godot 拖放三虚函数 ────────────────────────────────────────────────────────

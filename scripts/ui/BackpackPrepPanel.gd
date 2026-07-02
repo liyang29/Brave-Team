@@ -171,12 +171,12 @@ func _rebuild_pool() -> void:
 		var n: int = int(_pool.get(item_id, 0))
 		if n <= 0:
 			continue
-		var wrap := HBoxContainer.new()
-		wrap.add_theme_constant_override("separation", 2)
+		var entry_box := HBoxContainer.new()
+		entry_box.add_theme_constant_override("separation", 2)
 		var slot := _new_slot("pool", item_id, Vector2(110, 44))
 		slot.set_display(Backpack.item_name(item_id), Backpack.tier_color(Backpack.item_tier(item_id)), "×%d" % n)
 		slot.tooltip_text = Backpack.item_tooltip(item_id)
-		wrap.add_child(slot)
+		entry_box.add_child(slot)
 		if n >= 2 and Backpack.is_mergeable(item_id):
 			var result: String = Backpack.merge_result(item_id)
 			if result != "":
@@ -187,8 +187,8 @@ func _rebuild_pool() -> void:
 				merge_btn.pressed.connect(func():
 					merge_pool_item(item_id)
 					refresh())
-				wrap.add_child(merge_btn)
-		_pool_box.add_child(wrap)
+				entry_box.add_child(merge_btn)
+		_pool_box.add_child(entry_box)
 
 
 func _stat_text(entry: Dictionary, fs: Dictionary) -> String:
